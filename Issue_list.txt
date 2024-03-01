@@ -1,0 +1,51 @@
+Based on Paul's HeltecToSpark9 and SparkBox
+--------------------------------------------------------
+
+v0.42
+- 100% Heltec WIFI kit 32version
+- Battery scale initial calibration done
+- Optional true charging indicator
+
+v0.43
+- Battery display logic tweaked to handle all 3 build options
+
+v0.44
+- Tidy code. Prepare for BLE update
+
+v0.45
+- Initial BLE rough code
+- Throws errors on failed connects
+
+v0.46
+- General BLE release
+- Corrected crashes on failed connects
+- BT RSSI display working
+- Possible occasional unsync on reconnect
+
+v0.48
+- Merged SparkBox mods
+- Updated battery display
+
+v0.49
+- Merged SparkIO2
+- Works with app now
+- No disconnect ability
+
+v0.50
+- Merged SparkIO3
+- Works with app now
+- No disconnect ability
+
+v0.53
+- Fixed bug in SparkIO3
+- Merged with SparkTracker3
+- Smoothed out expression pedal noise nicely
+
+v0.55
+- Now only sends messages to connected devices
+- Sometimes will do a kind of double-disconnect when the app is removed. When this happens the app can not reconnectwithout a reboot.
+- Now shows a reconnect message when Spark is lost
+- No more bad blocks
+
+ToDo:
+- Find out why we get bad block messages sometimes
