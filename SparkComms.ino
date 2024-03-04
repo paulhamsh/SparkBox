@@ -196,10 +196,6 @@ void connect_spark() {
        DEBUG("connect_spark() thinks I was already connected");
     
     if (pClient_sp->connect(sp_device)) {
-
-      //Serial.print("GetMTU ");
-      //Serial.println(pClient_sp->getMTU());
-
       connected_sp = true;
       pService_sp = pClient_sp->getService(SpServiceUuid);
       if (pService_sp != nullptr) {
@@ -225,10 +221,11 @@ bool connect_to_all() {
   int counts;
   uint8_t b;
 
+  strcpy(spark_ble_name, "");
   ble_spark_connected = false;
   ble_app_connected = false;
 
-  BLEDevice::init(SPARK_BLE_NAME);
+  BLEDevice::init("");
   BLEDevice::setMTU(517);
   pClient_sp = BLEDevice::createClient();
   pClient_sp->setClientCallbacks(new MyClientCallback());
@@ -270,8 +267,9 @@ bool connect_to_all() {
       device = pResults.getDevice(i);
 
       if (device.isAdvertisingService(SpServiceUuid)) {
+        strncpy(spark_ble_name, device.getName().c_str(), SIZE_BLE_NAME);
         DEBUG("Found ");
-        DEBUG(device.getName().c_str());
+        DEBUG(spark_ble_name);
         found_sp = true;
         connected_sp = false;
         sp_device = new BLEAdvertisedDevice(device);
@@ -281,7 +279,9 @@ bool connect_to_all() {
 
   if (!found_sp) return false;   // failed to find the Spark within the number of counts allowed (MAX_SCAN_COUNT)
   connect_spark();
+  
   DEBUG("Available for app to connect...");  
+  pAdvertising->setName(spark_ble_name);
   pAdvertising->start(); 
 
   // timers for timeout

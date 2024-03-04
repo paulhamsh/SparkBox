@@ -1178,7 +1178,7 @@ void toggleTuner() {
 void tunerOn() {
   if (!isTunerMode) {
 #ifdef USE_NEW_SPARK
-    spark_message_out.tuner_on_off(true);
+    tuner_on_off(true);
 #else
     spark_msg_out.tuner_on_off(true);
 #endif
@@ -1194,10 +1194,10 @@ void tunerOn() {
 void tunerOff() {
   if (isTunerMode) {
 #ifdef USE_NEW_SPARK
-    spark_message_out.tuner_on_off(false);
+    tuner_on_off(false);
 #else
     spark_msg_out.tuner_on_off(false);
-#endif    
+#endif
     curMode = returnMode;
     DEB("Tuner mode OFF, return to: ");
     DEBUG(returnMode);
@@ -1331,12 +1331,8 @@ void uploadBankPresets(int bankNum) {
   }
   updateFxStatuses();
   pendingPresetNum = -2;
-#ifdef USE_NEW_SPARK  
-  // Is this right, will it work?
-  update_ui();
-#else
   update_ui_hardware();  
-#endif
+
 }
 
 // Load presets from bank files #bankNum into the array of presets presets[]

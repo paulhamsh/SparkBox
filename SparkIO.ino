@@ -358,7 +358,7 @@ void spark_process()
 
   if (last_spark_was_bad) {
     last_spark_was_bad = false;
-    spark_message_in.clear(); 
+    spark_msg_in.clear(); 
     DEBUG("Spark sent a bad block");
   }
 
@@ -378,7 +378,7 @@ void spark_process()
     len = compact(block_from_spark, block_from_spark, trim_len);
     //dump_processed_block(block_from_spark, len);
 
-    spark_message_in.set_from_array(block_from_spark, len); 
+    spark_msg_in.set_from_array(block_from_spark, len); 
   }
 }
 
@@ -390,7 +390,7 @@ void app_process()
 
   if (last_app_was_bad) {
     last_app_was_bad = false;
-    app_message_in.clear(); 
+    app_msg_in.clear(); 
     DEBUG("App sent a bad block");
   }
 
@@ -410,7 +410,7 @@ void app_process()
     len = compact(block_from_app, block_from_app, trim_len);
     //dump_processed_block(block_from_app, len);
 
-    app_message_in.set_from_array(block_from_app, len); 
+    app_msg_in.set_from_array(block_from_app, len); 
   }
 }
 
@@ -1367,8 +1367,8 @@ void spark_send() {
   int last_block_len;
   int this_len;
 
-  if (spark_message_out.has_message()) {
-    spark_message_out.copy_message_to_array(block_out, &len);
+  if (spark_msg_out.has_message()) {
+    spark_msg_out.copy_message_to_array(block_out, &len);
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
     len = add_headers(block_out, block_out_temp, len);
@@ -1392,7 +1392,7 @@ void spark_send() {
         t = millis();
         while (!done && (millis() - t) < 400) {  // add timeout just in case of no acknowledgement
           spark_process();
-          done = spark_message_in.check_for_acknowledgement();
+          done = spark_msg_in.check_for_acknowledgement();
         };
       }                             
     }
@@ -1410,8 +1410,8 @@ void app_send() {
   int last_block_len;
   int this_len;
 
-  if (app_message_out.has_message()) {
-    app_message_out.copy_message_to_array(block_out, &len);
+  if (app_msg_out.has_message()) {
+    app_msg_out.copy_message_to_array(block_out, &len);
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
     len = add_headers(block_out, block_out_temp, len);

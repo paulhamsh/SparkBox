@@ -4,11 +4,21 @@
 enum {S40=0, MINI, GO} spark_type = MINI;
 char *ble_names[]{"Spark 40 BLE", "Spark MINI BLE", "Spark GO BLE"};
 
-#define SPARK_BLE_NAME  "Spark 40 BLE"
-//#define SPARK_BLE_NAME  "Spark MINI BLE"
-//#define SPARK_BLE_NAME  "Spark GO BLE"
+#define SIZE_BLE_NAME 20
+char spark_ble_name[SIZE_BLE_NAME + 1];
 
-#define DEBUG(x) Serial.println(x);
+#define DEBUG_ON
+
+#ifndef DEBUG
+  #ifdef DEBUG_ON
+  // found this hint with __VA_ARGS__ on the web, it accepts different sets of arguments /Copych
+    #define DEB(...) Serial.print(__VA_ARGS__) 
+    #define DEBUG(...) Serial.println(__VA_ARGS__) 
+  #else
+    #define DEB(...)
+    #define DEBUG(...)
+  #endif
+#endif
 
 #ifdef CLASSIC
 #include "BluetoothSerial.h"
