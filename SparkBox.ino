@@ -56,7 +56,6 @@ extern String bankConfigFile;
 #include "SimplePortal.h"
 #include "RequestHandlersImpl.h"
 
-#define USE_NEW_SPARK 1
 
 //******************************************************************************************
 #define PGM_NAME "SparkBox"
@@ -292,12 +291,8 @@ void loop() {
   }
 #ifdef EXPRESSION_PEDAL
   // Only handle the pedal if the app is connected
-#ifdef USE_NEW_SPARK
-  if (ble_app_connected){
-#else
-  if (conn_status[APP]){
-#endif
 
+  if (ble_app_connected){
     doExpressionPedal();
   }
 #endif //EXPRESSION_PEDAL

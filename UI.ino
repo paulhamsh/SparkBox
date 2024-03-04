@@ -268,11 +268,7 @@ void mainIcons() {
     // Spark Amp BT connection icon
     drawStatusIcon(s_bt_bits, s_bt_width, STATUS_HEIGHT, 0,                 0, CONN_ICON_WIDTH, STATUS_HEIGHT, spark_state==SPARK_SYNCED);
     // App connection icon
-#ifdef USE_NEW_SPARK
     drawStatusIcon(a_bt_bits, a_bt_width, STATUS_HEIGHT, CONN_ICON_WIDTH+1, 0, CONN_ICON_WIDTH, STATUS_HEIGHT, ble_app_connected);
-#else
-    drawStatusIcon(a_bt_bits, a_bt_width, STATUS_HEIGHT, CONN_ICON_WIDTH+1, 0, CONN_ICON_WIDTH, STATUS_HEIGHT, conn_status[APP]);
-#endif
 
   } else {
     // WiFi connection icon
@@ -1177,11 +1173,7 @@ void toggleTuner() {
 // Tuner mode ON (amp side setting)
 void tunerOn() {
   if (!isTunerMode) {
-#ifdef USE_NEW_SPARK
     tuner_on_off(true);
-#else
-    spark_msg_out.tuner_on_off(true);
-#endif
     returnMode = mainMode;
     tempUI = false;
     curMode = MODE_TUNER;
@@ -1193,11 +1185,7 @@ void tunerOn() {
 // Tuner mode OFF (amp side setting)
 void tunerOff() {
   if (isTunerMode) {
-#ifdef USE_NEW_SPARK
     tuner_on_off(false);
-#else
-    spark_msg_out.tuner_on_off(false);
-#endif
     curMode = returnMode;
     DEB("Tuner mode OFF, return to: ");
     DEBUG(returnMode);
