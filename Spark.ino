@@ -293,8 +293,41 @@ void update_ui() {
 
 // SparkBox specific
 void update_ui_hardware() {
+  bool got;
+  int p;
+  int i;
+  bool done;
 
-};
+  done = false;
+  ble_passthru = false;
+
+  DEBUG("Updating UI for hardware");
+
+  i = 0;
+
+  while (i < 4) {
+    //p = (i == 4) ? 0x7f: i;
+    app_msg_out.save_hardware_preset(0x00, i);
+    app_send();
+
+    got = wait_for_app(0x0201);
+    if (got) {
+      DEB("Got hardware preset request ");
+      DEB(msg.param2);
+      DEB(" Looking for: ");
+      DEBUG(i);
+      presets[i].curr_preset = 0x00;
+      presets[i].preset_num = i;
+      app_msg_out.create_preset(&presets[i]);
+      app_send();
+      delay(1000);
+      i++;
+    }
+    else {
+      DEBUG("Didn't capture the new preset");
+    }
+  }
+}
 
 ///// ROUTINES TO CHANGE AMP SETTINGS
 
