@@ -144,12 +144,12 @@ typedef struct {
 
 
 char str[STR_LEN];                  // Used for processing Spark commands from amp
-char param_str[50];                 // 
-int param = -1;
+//char param_str[50];                 // 
+//int param = -1;
 float val = 0.0;
 bool expression_target = false;     // False = parameter change, true = effect on/off
 bool effectstate = false;           // Current state of the effect controller by the expression pedal
-bool setting_modified = false;      // Flag that user has modifed a setting
+//bool setting_modified = false;      // Flag that user has modifed a setting
 bool inWifi = false;
 bool wifi_connected = false;
 String bankPresetFiles[4];

@@ -242,7 +242,6 @@ bool connect_to_all() {
   pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   pCharacteristic_send = pService->createCharacteristic(S_CHAR2, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY); 
 
-
   pCharacteristic_receive->setCallbacks(&chrCallbacks_r);
   pCharacteristic_send->setCallbacks(&chrCallbacks_s);
   pService->start();
@@ -279,7 +278,6 @@ bool connect_to_all() {
 
   if (!found_sp) return false;   // failed to find the Spark within the number of counts allowed (MAX_SCAN_COUNT)
   connect_spark();
-  
   DEBUG("Available for app to connect...");  
   pAdvertising->setName(spark_ble_name);
   pAdvertising->start(); 

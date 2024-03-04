@@ -14,6 +14,13 @@ enum spark_status_values {SPARK_DISCONNECTED, SPARK_CONNECTED, SPARK_COMMUNICATI
 spark_status_values spark_state;
 unsigned long spark_ping_timer;
 
+//SparkBox specific
+bool setting_modified = false;      // Flag that user has modifed a setting
+bool isTunerMode;                   // Tuner mode flag
+char param_str[STR_LEN];                 // 
+int param = -1;
+uint8_t display_preset_num;         // Referenced preset number on Spark
+
 bool spark_state_tracker_start();
 bool update_spark_state();
 void update_ui();

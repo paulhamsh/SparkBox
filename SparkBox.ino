@@ -70,12 +70,12 @@ extern tPedalCfg pedalCfg;
 
 // Variables required to track spark state and also for communications generally
 bool got_presets = false;
-uint8_t display_preset_num;         // Referenced preset number on Spark
+//uint8_t display_preset_num;         // Referenced preset number on Spark
 int8_t active_led_num = -1;
 int i, j, p;
 int count;                          // "
 bool flash_GUI;                     // Flash GUI items if true
-bool isTunerMode;                   // Tuner mode flag
+//bool isTunerMode;                   // Tuner mode flag
 bool scan_result = false;           // Connection attempt result
 enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET, CUR_EDITING, TMP_PRESET_ADDR=0x007f};
 enum eEffects_t {FX_GATE, FX_COMP, FX_DRIVE, FX_AMP, FX_MOD, FX_DELAY, FX_REVERB};
