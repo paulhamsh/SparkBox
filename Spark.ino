@@ -115,11 +115,11 @@ bool spark_state_tracker_start() {
     if (got) {
       preset_to_get++;
       if (preset_to_get == 4) preset_to_get = 0x0100;
-      DEBUG("PRESET: "); 
+      DEB("PRESET: "); 
       DEBUG(pres);
     }
     else {
-      DEBUG("MISSED PRESET: "); 
+      DEB("MISSED PRESET: "); 
       DEBUG(pres);
     };
   }
@@ -156,7 +156,7 @@ bool  update_spark_state() {
   // and it is guaranteed that evaluation will stop as soon as the truth or falsehood is known.
   
   if (spark_msg_in.get_message(&cmdsub, &msg, &preset) || app_msg_in.get_message(&cmdsub, &msg, & preset)) {
-    DEBUG("Message: ");
+    DEB("Message: ");
     DEBUG(cmdsub, HEX);
 
     // all the processing for sync
@@ -169,7 +169,7 @@ bool  update_spark_state() {
           pres = 5;
         presets[pres] = preset;
         //dump_preset(&presets[pres]);
-        DEBUG("Got preset ");
+        DEB("Got preset ");
         DEBUG(pres);
         break;
       // change of amp model
@@ -266,29 +266,31 @@ bool  update_spark_state() {
 void update_ui() {
   bool got;
 
-  ble_passthru = false;
-  app_msg_out.save_hardware_preset(0x00, 0x03);
-  app_send();
+  if (ble_app_connected) {
+    ble_passthru = false;
+    app_msg_out.save_hardware_preset(0x00, 0x03);
+    app_send();
 
-  DEBUG("Updating UI");
-  got = wait_for_app(0x0201);
-  if (got) {
-    strcpy(presets[5].Name, "SyncPreset");
-    strcpy(presets[5].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
-    presets[5].curr_preset = 0x00;
-    presets[5].preset_num = 0x03;
-    app_msg_out.create_preset(&presets[5]);
-    app_send();
-    delay(100);
-    app_msg_out.change_hardware_preset(0x00, 0x00);
-    app_send();
-    app_msg_out.change_hardware_preset(0x00, 0x03);     
-    app_send();
+    DEBUG("Updating UI");
+    got = wait_for_app(0x0201);
+    if (got) {
+      strcpy(presets[5].Name, "SyncPreset");
+      strcpy(presets[5].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
+      presets[5].curr_preset = 0x00;
+      presets[5].preset_num = 0x03;
+      app_msg_out.create_preset(&presets[5]);
+      app_send();
+      delay(100);
+      app_msg_out.change_hardware_preset(0x00, 0x00);
+      app_send();
+      app_msg_out.change_hardware_preset(0x00, 0x03);     
+      app_send();
+    }
+    else {
+      DEBUG("Didn't capture the new preset");
+    }
+    ble_passthru = true;
   }
-  else {
-    DEBUG("Didn't capture the new preset");
-  }
-  ble_passthru = true;
 }
 
 // SparkBox specific
@@ -298,33 +300,34 @@ void update_ui_hardware() {
   int i;
   bool done;
 
-  done = false;
-  ble_passthru = false;
+  if (ble_app_connected) {
+    done = false;
+    ble_passthru = false;
 
-  DEBUG("Updating UI for hardware");
+    DEBUG("Updating UI for hardware");
 
-  i = 0;
+    i = 0;
 
-  while (i < 4) {
-    //p = (i == 4) ? 0x7f: i;
-    app_msg_out.save_hardware_preset(0x00, i);
-    app_send();
-
-    got = wait_for_app(0x0201);
-    if (got) {
-      DEB("Got hardware preset request ");
-      DEB(msg.param2);
-      DEB(" Looking for: ");
-      DEBUG(i);
-      presets[i].curr_preset = 0x00;
-      presets[i].preset_num = i;
-      app_msg_out.create_preset(&presets[i]);
+    while (i < 4) {
+      app_msg_out.save_hardware_preset(0x00, i);
       app_send();
-      delay(1000);
-      i++;
-    }
-    else {
-      DEBUG("Didn't capture the new preset");
+
+      got = wait_for_app(0x0201);
+      if (got) {
+        DEB("Got hardware preset request ");
+        DEB(msg.param2);
+        DEB(" Looking for: ");
+        DEBUG(i);
+        presets[i].curr_preset = 0x00;
+        presets[i].preset_num = i;
+        app_msg_out.create_preset(&presets[i]);
+        app_send();
+        delay(1000);
+        i++;
+      }
+      else {
+        DEBUG("Didn't capture the new preset");
+      }
     }
   }
 }

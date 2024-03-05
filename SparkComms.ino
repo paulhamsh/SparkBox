@@ -248,6 +248,7 @@ bool connect_to_all() {
   pServer->start(); 
 
   pAdvertising = BLEDevice::getAdvertising(); // create advertising instance
+  
   pAdvertising->addServiceUUID(pService->getUUID()); // tell advertising the UUID of our service
   pAdvertising->setScanResponse(true);  
 
@@ -269,6 +270,16 @@ bool connect_to_all() {
         strncpy(spark_ble_name, device.getName().c_str(), SIZE_BLE_NAME);
         DEBUG("Found ");
         DEBUG(spark_ble_name);
+        //manuf_data = device.getManufacturerData();
+        //std::string s = device.getManufacturerData();
+        //const char *st = s.c_str();
+        //int len = s.length();
+        //for (int k = 0; k < len; k++)  {
+        //  DEB(st[k], HEX);
+        //  DEB(" ");
+        //};
+        //DEBUG("");
+
         found_sp = true;
         connected_sp = false;
         sp_device = new BLEAdvertisedDevice(device);
@@ -279,7 +290,23 @@ bool connect_to_all() {
   if (!found_sp) return false;   // failed to find the Spark within the number of counts allowed (MAX_SCAN_COUNT)
   connect_spark();
   DEBUG("Available for app to connect...");  
+
+  //== Start: try to look like a Spark Go
+  //char scan_data[] = {0x0e,0x09,0x53,0x70,0x61,0x72,0x6b,0x20,0x47,0x4f,0x20,0x42,0x4c,0x45,0x00};
+  //char adv_data[] =  {0x02,0x01,0x0a,0x03,0x03,0xc0,0xff,0x0b,0xff,0x06,0x10,0x00,0x00,0x08,0xeb,0xed,0x3d,0x5d,0x5a};
+
+  //BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
+  //BLEAdvertisementData oScanAdvertisementData = BLEAdvertisementData();  
+
+  //oScanAdvertisementData.addData(scan_data, sizeof(scan_data));
+  //oAdvertisementData.addData(adv_data, sizeof(adv_data));
+
+  //pAdvertising->setAdvertisementData(oAdvertisementData);
+  //pAdvertising->setScanResponseData(oScanAdvertisementData);
+  //== Stop: that code
+
   pAdvertising->setName(spark_ble_name);
+  //pAdvertising->setManufacturerData(manuf_data);
   pAdvertising->start(); 
 
   // timers for timeout
