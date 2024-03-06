@@ -59,6 +59,7 @@ void change_hardware_preset(int pres_num);
 void change_custom_preset(SparkPreset *preset, int pres_num);
 
 void tuner_on_off(bool on_off);
+void send_tap_tempo(float tempo);
 
 #define AMP_GAIN 0
 #define AMP_TREBLE 1

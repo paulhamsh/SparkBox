@@ -520,3 +520,9 @@ void tuner_on_off(bool on_off) {
   spark_msg_out.tuner_on_off(on_off); 
   spark_send();  
 }
+
+
+void send_tap_tempo(float tempo) {
+  spark_msg_out.send_tap_tempo(tempo);
+  spark_send();    
+};
