@@ -731,14 +731,13 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       Serial.print(cs, HEX);
       Serial.print(" length ");
       Serial.print(len);
-      /*
+
       Serial.print(":");
       for (i = 0; i < len - 4; i++) {
         read_byte(&junk);
         Serial.print(junk, HEX);
         Serial.print(" ");
       }
-      */
       Serial.println();
       // defensively clear the message buffer in case this is a bug
       in_message.clear();
@@ -1050,6 +1049,19 @@ void MessageOut::send_preset_number(uint8_t preset_h, uint8_t preset_l)
    write_byte(preset_l);
    end_message();
 }
+
+void MessageOut::send_tap_tempo(float val)
+{
+   if (cmd_base == 0x0100) 
+     start_message (cmd_base + 0x62);
+   else
+     start_message (cmd_base + 0x63);   // is this right??
+   write_float(val);
+   write_byte(0x3f);
+   write_byte(0x3f);
+   end_message();
+}
+
 
 void MessageOut::tuner_on_off(bool onoff)
 {
