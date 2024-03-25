@@ -83,8 +83,9 @@ MessageIn app_msg_in;
 MessageOut spark_msg_out(0x0100);
 MessageOut app_msg_out(0x0300);
 
-void spark_process();
-void app_process();
+void process_sparkIO();
+//void spark_process();
+//void app_process();
 
 void spark_send();
 void app_send();

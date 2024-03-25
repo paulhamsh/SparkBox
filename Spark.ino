@@ -149,8 +149,11 @@ bool  update_spark_state() {
     }
   }
 
-  spark_process();
-  app_process();
+
+  process_sparkIO();
+//  spark_comms_process();
+//  spark_process();
+//  app_process();
   
   // K&R: Expressions connected by && or || are evaluated left to right, 
   // and it is guaranteed that evaluation will stop as soon as the truth or falsehood is known.

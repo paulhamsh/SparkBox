@@ -2,11 +2,15 @@
 
 
 // Timer routines
-#define TIMER 100000
+//#define TIMER 100000
 #define SPARK_TIMEOUT 200
-#define APP_TIMEOUT 500
+#ifdef CLASSIC
+#define APP_TIMEOUT 3000
+#else
+#define APP_TIMEOUT 400
+#endif
 
-hw_timer_t *timer_sp = NULL;
+//hw_timer_t *timer_sp = NULL;
 
 bool spark_timer_active = false;
 unsigned long last_spark_time;
@@ -14,8 +18,21 @@ unsigned long last_spark_time;
 bool app_timer_active = false;
 unsigned long last_app_time;
 
+
+
+#define PASSTHRU_TABLE_SIZE 30
+
+int passthru_packet_index = 0;
+int passthru_packet_start[PASSTHRU_TABLE_SIZE];
+int passthru_packet_length[PASSTHRU_TABLE_SIZE];
+
+//SemaphoreHandle_t xFromAppMutex = NULL;  // Create a mutex object
+QueueHandle_t qAppToSpark;
+
+
 // this is to catch a good block that ends on a 10, 20 or 106 byte boundary via a timeout
-void ARDUINO_ISR_ATTR timer_cb_sp() {
+//void ARDUINO_ISR_ATTR timer_cb_sp() {
+void spark_comms_timer() {
   if (spark_timer_active && (millis() - last_spark_time > SPARK_TIMEOUT)) {
     spark_timer_active = false;
     if (from_spark_index != 0) {
@@ -51,6 +68,7 @@ void ARDUINO_ISR_ATTR timer_cb_sp() {
   }
 }
 
+/*
 void start_timer() {
   timerRestart(timer_sp);
   timerAlarmWrite(timer_sp, TIMER, true);
@@ -66,7 +84,38 @@ void setup_timer_sp() {
   spark_timer_active = false;
   app_timer_active = false;
 }
+*/
 
+
+void spark_comms_process() {
+  int packets_waiting;
+  int i;
+  int index;
+  int len, pos;
+
+  // process the 
+  spark_comms_timer();
+  
+  // do passthru to app
+  // it seems to be important to send all queued packets close together else the app gets disconnected - especially the 170 message
+  while (uxQueueMessagesWaiting(qAppToSpark) > 0) {
+    xQueueReceive(qAppToSpark, &index, (TickType_t) 0);
+    //Serial.print(index);
+    //Serial.println();
+    len = passthru_packet_length[index];
+    if (len != 0) {
+      pos = passthru_packet_start[index];
+      //Serial.print("Sending passthru ");
+      //Serial.print(index);
+      //Serial.print(" : ");
+      //Serial.print(pos);
+      //Serial.print(" : ");
+      //Serial.println(len);
+      pSender_sp->writeValue((uint8_t *) &from_app[pos], len, false);    
+      passthru_packet_length[index] = 0;
+    }
+  }
+}
 
 
 const uint8_t notifyOn[] = {0x1, 0x0};
@@ -104,6 +153,25 @@ class MyServerCallback : public BLEServerCallbacks {
   }
 };
 
+#ifdef CLASSIC
+// server callback for connection to BT classic app
+
+void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
+  if(event == ESP_SPP_SRV_OPEN_EVT){
+    DEBUG("callback: Classic BT Spark app connected");
+    bt_app_connected = true;
+  }
+ 
+  if(event == ESP_SPP_CLOSE_EVT ){
+    DEBUG("callback: Classic BT Spark app disconnected");
+    bt_app_connected = false;
+  }
+}
+#endif
+
+
+
+
 // Blocks sent to the app are max length 0xad or 173 bytes. This includes the 16 byte block header.
 // Without that header the block is 157 bytes.
 // For Spark 40 BLE they are sent as 100 bytes then 73 bytes.
@@ -121,6 +189,9 @@ class MyServerCallback : public BLEServerCallbacks {
 // Example
 // F0 01 04 1F 03 01   20  0E 00 19  00 00 59 24   00 39 44 32 46 32 41 41   00 33 2D 34 45 43 35 2D   00 34 42 44 37 2D 41 33   F7
 
+
+// From the Spark
+
 void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
   // copy to the buffer
   if (from_spark_index + length < BLE_BUFSIZE) {
@@ -134,11 +205,17 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   }
 
   // passthru
-  if (ble_passthru) {
+  if (ble_passthru && ble_app_connected) {
     pCharacteristic_send->setValue(pData, length);
     pCharacteristic_send->notify(true);
   }
-  
+
+  #ifdef CLASSIC
+  if (ble_passthru && bt_app_connected) {
+    bt->write(pData, length);
+  }
+  #endif
+
   // check to see if this is the end of a block - if not a standard packet size (20, 10, 106) then it definitely is
   // but it could also happen to be a standard size and the end of a block
   // in which case we set up a timer to catch it
@@ -153,15 +230,19 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   }
 }
 
+// From the app
 
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
+
     // copy to the buffer 
     std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
     int length = s.size();
+    const char *data = s.c_str();
+    int index = from_app_index;
 
     if (from_app_index + length < BLE_BUFSIZE) {
-      memcpy(&from_app[from_app_index], s.c_str(), length);
+      memcpy(&from_app[from_app_index], data, length);
       from_app_index += length;
     }
     else {
@@ -171,8 +252,18 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     }
 
     // passthru
-    if (ble_passthru) 
-      pSender_sp->writeValue((uint8_t *) s.c_str(), length, false);
+    if (ble_passthru) {
+      #ifdef CLASSIC 
+        passthru_packet_start[passthru_packet_index] = index;
+        passthru_packet_length[passthru_packet_index] = length;
+        xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
+        passthru_packet_index++;
+        if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
+          passthru_packet_index = 0;
+      #else
+        pSender_sp->writeValue((uint8_t *) s.c_str(), length, false);
+      #endif
+    }
 
     // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173
     if (length != 100 && length != 73) {
@@ -183,10 +274,49 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
       last_app_time = millis();
       app_timer_active = true;
     }
+
   };
 };
 
 static CharacteristicCallbacks chrCallbacks_s, chrCallbacks_r;
+
+
+// Serial BT callback for data
+void data_callback(const uint8_t *buffer, size_t size) {
+  int index = from_app_index;
+
+  if (from_app_index + size < BLE_BUFSIZE) {
+    memcpy(&from_app[from_app_index], buffer, size);
+    //for (int i=0; i < length; i++) {Serial.print(" "); Serial.print(from_app[from_app_index + i], HEX);}
+    //Serial.println();
+    from_app_index += size;
+  }
+  else {
+    from_app_index = 0;
+    last_app_was_bad = true;
+    DEBUG("Exceeded app block size");
+  }
+
+  
+
+  // passthru
+  if (ble_passthru) {
+    passthru_packet_start[passthru_packet_index] = index;
+    passthru_packet_length[passthru_packet_index] = size;
+    passthru_packet_index++;
+  }
+  
+  // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173
+  if (size != 173) {
+    got_app_block = true;
+    app_timer_active = false;
+  }
+  else {
+    last_app_time = millis();
+    app_timer_active = true;
+  }
+}
+
 
 BLEUUID SpServiceUuid(C_SERVICE);
 
@@ -196,17 +326,27 @@ void connect_spark() {
        DEBUG("connect_spark() thinks I was already connected");
     
     if (pClient_sp->connect(sp_device)) {
+#if defined CLASSIC  && !defined HELTEC_WIFI
+        pClient_sp->setMTU(517);  
+#endif
       connected_sp = true;
       pService_sp = pClient_sp->getService(SpServiceUuid);
       if (pService_sp != nullptr) {
         pSender_sp   = pService_sp->getCharacteristic(C_CHAR1);
         pReceiver_sp = pService_sp->getCharacteristic(C_CHAR2);
         if (pReceiver_sp && pReceiver_sp->canNotify()) {
+#ifdef CLASSIC
+          pReceiver_sp->registerForNotify(notifyCB_sp);
+          p2902_sp = pReceiver_sp->getDescriptor(BLEUUID((uint16_t)0x2902));
+          if (p2902_sp != nullptr)
+             p2902_sp->writeValue((uint8_t*)notifyOn, 2, true);
+#else
           if (!pReceiver_sp->subscribe(true, notifyCB_sp, true)) {
             connected_sp = false;
             DEBUG("Spark disconnected");
             NimBLEDevice::deleteClient(pClient_sp);
           }   
+#endif
         } 
       }
       DEBUG("connect_spark(): Spark connected");
@@ -216,16 +356,24 @@ void connect_spark() {
 }
 
 
+
+
+
+
 bool connect_to_all() {
   int i, j;
   int counts;
   uint8_t b;
 
-  strcpy(spark_ble_name, "");
+  //xFromAppMutex = xSemaphoreCreateMutex();
+  qAppToSpark = xQueueCreate(5, sizeof(int));
+
+  strcpy(spark_ble_name, SPARK_BLE_NAME);
   ble_spark_connected = false;
   ble_app_connected = false;
+  bt_app_connected = false;    // only for Serial Bluetooth
 
-  BLEDevice::init("");
+  BLEDevice::init(spark_ble_name);        // put here for CLASSIC code
   BLEDevice::setMTU(517);
   pClient_sp = BLEDevice::createClient();
   pClient_sp->setClientCallbacks(new MyClientCallback());
@@ -239,13 +387,24 @@ bool connect_to_all() {
   pServer->setCallbacks(new MyServerCallback());  
   pService = pServer->createService(S_SERVICE);
 
+#ifdef CLASSIC  
+  pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+  pCharacteristic_send = pService->createCharacteristic(S_CHAR2, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+#else
   pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   pCharacteristic_send = pService->createCharacteristic(S_CHAR2, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY); 
+#endif
 
   pCharacteristic_receive->setCallbacks(&chrCallbacks_r);
   pCharacteristic_send->setCallbacks(&chrCallbacks_s);
+#ifdef CLASSIC
+  pCharacteristic_send->addDescriptor(new BLE2902());
+#endif
+
   pService->start();
+#ifndef CLASSIC
   pServer->start(); 
+#endif
 
   pAdvertising = BLEDevice::getAdvertising(); // create advertising instance
   
@@ -270,15 +429,6 @@ bool connect_to_all() {
         strncpy(spark_ble_name, device.getName().c_str(), SIZE_BLE_NAME);
         DEBUG("Found ");
         DEBUG(spark_ble_name);
-        //manuf_data = device.getManufacturerData();
-        //std::string s = device.getManufacturerData();
-        //const char *st = s.c_str();
-        //int len = s.length();
-        //for (int k = 0; k < len; k++)  {
-        //  DEB(st[k], HEX);
-        //  DEB(" ");
-        //};
-        //DEBUG("");
 
         found_sp = true;
         connected_sp = false;
@@ -289,6 +439,27 @@ bool connect_to_all() {
 
   if (!found_sp) return false;   // failed to find the Spark within the number of counts allowed (MAX_SCAN_COUNT)
   connect_spark();
+
+#ifdef CLASSIC
+  DEBUG("Starting classic bluetooth");
+  // now advertise Serial Bluetooth
+  bt = new BluetoothSerial();
+  bt->register_callback(bt_callback);
+  if (!bt->begin (SPARK_BT_NAME, false)) {
+    DEBUG("Classic bluetooth init fail");
+    while (true);
+  }
+
+  bt->onData(data_callback);
+
+  // flush anything read from App - just in case
+  while (bt->available())
+    b = bt->read(); 
+  DEBUG("Spark serial bluetooth set up");
+#endif
+
+
+
   DEBUG("Available for app to connect...");  
 
   //== Start: try to look like a Spark Go
@@ -305,12 +476,15 @@ bool connect_to_all() {
   //pAdvertising->setScanResponseData(oScanAdvertisementData);
   //== Stop: that code
 
+#ifndef CLASSIC
   pAdvertising->setName(spark_ble_name);
+#endif
+
   //pAdvertising->setManufacturerData(manuf_data);
   pAdvertising->start(); 
 
   // timers for timeout
-  setup_timer_sp();
+  //setup_timer_sp();
 
   // flags for data availability
   got_app_block = false;
@@ -325,8 +499,15 @@ void send_to_spark(byte *buf, int len) {
 
 
 void send_to_app(byte *buf, int len) {
-  pCharacteristic_send->setValue(buf, len);
-  pCharacteristic_send->notify(true);
+  if (ble_app_connected) {
+    pCharacteristic_send->setValue(buf, len);
+    pCharacteristic_send->notify(true);
+  }
+#if defined CLASSIC
+  else {
+    bt->write(buf, len);
+  }
+#endif
 }
 
 // for some reason getRssi() crashes with two clients!

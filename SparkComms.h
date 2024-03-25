@@ -1,8 +1,8 @@
 #ifndef SparkComms_h
 #define SparkComms_h
 
-enum {S40=0, MINI, GO} spark_type = MINI;
-char *ble_names[]{"Spark 40 BLE", "Spark MINI BLE", "Spark GO BLE"};
+//enum {S40=0, MINI, GO} spark_type = MINI;
+//char *ble_names[]{"Spark 40 BLE", "Spark MINI BLE", "Spark GO BLE"};
 
 #define SIZE_BLE_NAME 20
 char spark_ble_name[SIZE_BLE_NAME + 1];
@@ -20,18 +20,26 @@ char spark_ble_name[SIZE_BLE_NAME + 1];
   #endif
 #endif
 
+#define SPARK_BT_NAME  "Spark 40"
+#define SPARK_BLE_NAME "Spark 40 BLE"
+
 #ifdef CLASSIC
 #include "BluetoothSerial.h"
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+
+BluetoothSerial *bt;
 #else
 #include "NimBLEDevice.h"
 #endif
 
+#define BLE_BUFSIZE 2000
 
-#define BLE_BUFSIZE 5000
+byte app_to_spark_data[BLE_BUFSIZE];
+int app_to_spark_len = 0;
+
 
 byte from_app[BLE_BUFSIZE];
 int from_app_index = 0;
@@ -61,11 +69,14 @@ void connect_spark();
 void send_to_spark(); 
 void send_to_app();
 
+void spark_comms_process();
+
 int ble_getRSSI();
 
 
 bool ble_app_connected;
 bool ble_spark_connected;
+bool bt_app_connected;
 
 bool connected_sp;
 bool found_sp;
