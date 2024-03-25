@@ -297,15 +297,26 @@ void data_callback(const uint8_t *buffer, size_t size) {
     DEBUG("Exceeded app block size");
   }
 
-  
 
+  // passthru
+  if (ble_passthru) {
+    passthru_packet_start[passthru_packet_index] = index;
+    passthru_packet_length[passthru_packet_index] = size;
+    xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
+    passthru_packet_index++;
+    if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
+      passthru_packet_index = 0;
+  }
+  
+  /*
   // passthru
   if (ble_passthru) {
     passthru_packet_start[passthru_packet_index] = index;
     passthru_packet_length[passthru_packet_index] = size;
     passthru_packet_index++;
   }
-  
+  */
+
   // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173
   if (size != 173) {
     got_app_block = true;
