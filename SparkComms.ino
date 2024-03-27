@@ -375,11 +375,12 @@ bool connect_to_all() {
   int i, j;
   int counts;
   uint8_t b;
+  int len;
 
   //xFromAppMutex = xSemaphoreCreateMutex();
   qAppToSpark = xQueueCreate(5, sizeof(int));
 
-  strcpy(spark_ble_name, SPARK_BLE_NAME);
+  strcpy(spark_ble_name, DEFAULT_SPARK_BLE_NAME);
   ble_spark_connected = false;
   ble_app_connected = false;
   bt_app_connected = false;    // only for Serial Bluetooth
@@ -456,7 +457,14 @@ bool connect_to_all() {
   // now advertise Serial Bluetooth
   bt = new BluetoothSerial();
   bt->register_callback(bt_callback);
-  if (!bt->begin (SPARK_BT_NAME, false)) {
+  len = strlen(spark_ble_name);
+  strncpy(spark_bt_name, spark_ble_name, len - 4);   // effectively strip off the ' BLE' at the end
+  spark_bt_name[len - 4] = '\0';
+
+  DEB("Creating classic bluetooth with name ");
+  DEBUG(spark_bt_name);
+  
+  if (!bt->begin (spark_bt_name, false)) {
     DEBUG("Classic bluetooth init fail");
     while (true);
   }

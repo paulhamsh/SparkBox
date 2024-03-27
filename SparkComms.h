@@ -6,6 +6,7 @@
 
 #define SIZE_BLE_NAME 20
 char spark_ble_name[SIZE_BLE_NAME + 1];
+char spark_bt_name[SIZE_BLE_NAME + 1];
 
 #define DEBUG_ON
 
@@ -20,8 +21,10 @@ char spark_ble_name[SIZE_BLE_NAME + 1];
   #endif
 #endif
 
-#define SPARK_BT_NAME  "Spark 40"
-#define SPARK_BLE_NAME "Spark 40 BLE"
+//#define SPARK_BT_NAME  "Spark 40"
+//#define SPARK_BT_NAME  "Spark MINI"
+//#define SPARK_BT_NAME  "Spark GO"
+#define DEFAULT_SPARK_BLE_NAME "Spark 40 BLE"
 
 #ifdef CLASSIC
 #include "BluetoothSerial.h"

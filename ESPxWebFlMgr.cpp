@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <inttypes.h>
 
-#include "banks.h"
+#include "Banks.h"
 extern tBankConfig bankConfig[NUM_BANKS+1];
 extern String bankConfigFile;
 void loadConfiguration(const String filename, tBankConfig (&conf)[NUM_BANKS+1]);

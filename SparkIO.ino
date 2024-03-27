@@ -740,10 +740,12 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       Serial.print(len);
 
       Serial.print(":");
-      for (i = 0; i < len - 4; i++) {
-        read_byte(&junk);
-        Serial.print(junk, HEX);
-        Serial.print(" ");
+      if (len != 0) {
+        for (i = 0; i < len - 4; i++) {
+          read_byte(&junk);
+          Serial.print(junk, HEX);
+          Serial.print(" ");
+        }
       }
       Serial.println();
       // defensively clear the message buffer in case this is a bug
