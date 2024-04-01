@@ -736,7 +736,6 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 
 
 
-
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
     // Not sure what this represents, but it is an array of: byte byte boolean
     case 0x031a:
@@ -758,8 +757,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEBUG(msg->param3);
       DEBUG(msg->param4);
       if (msg->bool2) DEBUG("On"); else DEBUG("Off");
-      if (num != 2)
-        in_message.clear();   // clear rest of message as we haven't used it
+      in_message.clear();   // clear rest of message as we haven't used it
       break;
     // LIVE INPUT 1 Guitar Volume
     case 0x036b:
@@ -785,8 +783,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param2);
       DEBUG(msg->param1);
       DEBUG(msg->param1);
-      if (num != 1)
-        in_message.clear();   // clear rest of message as we haven't used it
+      in_message.clear();   // clear rest of message as we haven't used it
       break;
     case 0x0373:
       DEB("LIVE INPUT 2 Cable Insert");
@@ -807,11 +804,10 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEBUG(msg->param3);
       DEBUG(msg->param4);
       if (msg->bool2) DEBUG("On"); else DEBUG("Off");
-      if (num != 2)
-        in_message.clear();   // clear rest of message as we haven't used it
+      in_message.clear();   // clear rest of message as we haven't used it
       break;
 
-
+/*
     case 0x0371:
       DEBUG("undefined Battery?");
       read_byte(&msg->param1);
@@ -829,7 +825,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEBUG(msg->param5, HEX);   
       in_message.clear();
       break;
-
+*/
 
     // unprocessed Spark GO/MINI messages
     case 0x0272:
@@ -837,20 +833,23 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0271:
     case 0x0304:
     case 0x0204:
+      in_message.clear();
       break;
     // Power Settings for MINI, GO, LIVE
     case 0x0472:
       DEBUG("undefined Power Settings");
+      in_message.clear();
       break;
-
     // LIVE INPUT Impedence
     case 0x0474:
       DEBUG("undefined LIVE Input Impedence");
+      in_message.clear();
       break;
     // unprocessed LIVE Connection Messages
     case 0x022b:
     case 0x032b:
       DEBUG("undefined LIVE connection messages");
+      in_message.clear();
       break;
 
 
