@@ -28,10 +28,14 @@ typedef struct {
   uint8_t param3;
   uint8_t param4;
   uint32_t param5;
+  uint8_t param6;
+  uint8_t param7;
   float val;
   char str1[STR_LEN];
   char str2[STR_LEN];
   bool onoff;
+  bool bool1;
+  bool bool2;
 } SparkMessage;
 
 

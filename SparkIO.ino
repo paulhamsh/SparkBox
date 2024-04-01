@@ -556,7 +556,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
    
   uint8_t junk;
   int i, j;
-  uint8_t num;
+  uint8_t num, num1, num2;
 
   if (in_message.is_empty()) return false;
 
@@ -701,7 +701,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(preset->Icon);
       read_float(&preset->BPM);
 
-      for (j=0; j<7; j++) {
+      for (j=0; j < 7; j++) {
         read_string(preset->effects[j].EffectName);
         read_onoff(&preset->effects[j].OnOff);
         read_byte(&num);
@@ -730,9 +730,130 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0415:
     case 0x0438:
     case 0x0465:
-//      Serial.print("Got an ack ");
-//      Serial.println(cs, HEX);
+    // Serial.print("Got an ack ");
+    // Serial.println(cs, HEX);
       break;
+
+
+
+
+    // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
+    // Not sure what this represents, but it is an array of: byte byte boolean
+    case 0x031a:
+      DEBUG("LIVE message 0x031a");
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      DEB("Fixed array size: ");
+      DEBUG(num);
+      // Assume size 2 for now
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_onoff(&msg->bool1);
+      read_byte(&msg->param3);
+      read_byte(&msg->param4);
+      read_onoff(&msg->bool2);   
+      DEBUG(msg->param1);
+      DEBUG(msg->param2);
+      if (msg->bool1) DEBUG("On"); else DEBUG("Off");
+      DEBUG(msg->param3);
+      DEBUG(msg->param4);
+      if (msg->bool2) DEBUG("On"); else DEBUG("Off");
+      if (num != 2)
+        in_message.clear();   // clear rest of message as we haven't used it
+      break;
+    // LIVE INPUT 1 Guitar Volume
+    case 0x036b:
+      DEB("LIVE INPUT 1 Guitar Volume ");
+      read_float(&msg->val);
+      DEBUG(msg->val);
+      break;
+    // LIVE Mixer
+    case 0x0333:
+      DEB("LIVE Mixer ");
+      read_float(&msg->val);
+      DEBUG(msg->val);
+      break;
+    // LIVE INPUT 2 Cable Insert
+    case 0x0374:
+      DEB("LIVE INPUT 2 Cable Insert");
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      DEB("Fixed array size: ");
+      DEBUG(num);
+      // Assume size 1 for now
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      DEBUG(msg->param1);
+      DEBUG(msg->param1);
+      if (num != 1)
+        in_message.clear();   // clear rest of message as we haven't used it
+      break;
+    case 0x0373:
+      DEB("LIVE INPUT 2 Cable Insert");
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      DEB("Fixed array size: ");
+      DEBUG(num);
+      // Assume size 2 for now
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_onoff(&msg->bool1);
+      read_byte(&msg->param3);
+      read_byte(&msg->param4);
+      read_onoff(&msg->bool2);   
+      DEBUG(msg->param1);
+      DEBUG(msg->param2);
+      if (msg->bool1) DEBUG("On"); else DEBUG("Off");
+      DEBUG(msg->param3);
+      DEBUG(msg->param4);
+      if (msg->bool2) DEBUG("On"); else DEBUG("Off");
+      if (num != 2)
+        in_message.clear();   // clear rest of message as we haven't used it
+      break;
+
+
+    case 0x0371:
+      DEBUG("undefined Battery?");
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_byte(&msg->param3);
+      read_byte(&msg->param4);   
+      read_byte(&num);  
+      read_byte(&num); 
+      DEBUG(num, HEX);    // should be 0xCD
+      read_byte(&num1);
+      read_byte(&num2);
+      bytes_to_uint(num1, num2, &msg->param5);
+      read_byte(&msg->param6);    
+      read_byte(&msg->param7);   
+      DEBUG(msg->param5, HEX);   
+      in_message.clear();
+      break;
+
+
+    // unprocessed Spark GO/MINI messages
+    case 0x0272:
+    case 0x0372:
+    case 0x0271:
+    case 0x0304:
+    case 0x0204:
+      break;
+    // Power Settings for MINI, GO, LIVE
+    case 0x0472:
+      DEBUG("undefined Power Settings");
+      break;
+
+    // LIVE INPUT Impedence
+    case 0x0474:
+      DEBUG("undefined LIVE Input Impedence");
+      break;
+    // unprocessed LIVE Connection Messages
+    case 0x022b:
+    case 0x032b:
+      DEBUG("undefined LIVE connection messages");
+      break;
+
+
     default:
       Serial.print("Unprocessed message ");
       Serial.print(cs, HEX);
