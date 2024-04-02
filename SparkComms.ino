@@ -220,7 +220,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   // but it could also happen to be a standard size and the end of a block
   // in which case we set up a timer to catch it
 
-  if (length != 20 && length != 10 && length != 106) {
+  if (length != 20 && length != 10 && length != 19 && length != 106) {   // added 19 for Spark LIVE
     got_spark_block = true;
     spark_timer_active = false;
   }

@@ -7,8 +7,12 @@
 unsigned int cmdsub;
 SparkMessage msg;
 SparkPreset preset;
-SparkPreset presets[6];
+SparkPreset presets[12];
 
+int num_presets = 4;          // default num_presets
+int cur_preset = 5;          // default CUR_EDITING
+int temp_preset = 4;
+int temp_preset_addr = 0x7f;
 
 enum spark_status_values {SPARK_DISCONNECTED, SPARK_CONNECTED, SPARK_COMMUNICATING, SPARK_CHECKSUM, SPARK_SYNCING, SPARK_SYNCED};
 spark_status_values spark_state;
