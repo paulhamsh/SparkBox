@@ -9,6 +9,7 @@ SparkMessage msg;
 SparkPreset preset;
 SparkPreset presets[12];
 
+// Not used yet - will be though
 int num_presets = 4;          // default num_presets
 int cur_preset = 5;          // default CUR_EDITING
 int temp_preset = 4;

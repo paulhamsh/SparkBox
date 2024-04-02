@@ -1,6 +1,17 @@
 #ifndef SparkComms_h
 #define SparkComms_h
 
+
+// Timer routines
+//#define TIMER 100000
+#define SPARK_TIMEOUT 200
+#ifdef CLASSIC
+#define APP_TIMEOUT 3000
+#else
+#define APP_TIMEOUT 400
+#endif
+
+
 //enum {S40=0, MINI, GO} spark_type = MINI;
 //char *ble_names[]{"Spark 40 BLE", "Spark MINI BLE", "Spark GO BLE"};
 
