@@ -861,7 +861,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 
       Serial.print(":");
       if (len != 0) {
-        for (i = 0; i < len - 4; i++) {
+        for (i = 0; i < len - 6; i++) {
           read_byte(&junk);
           Serial.print(junk, HEX);
           Serial.print(" ");
