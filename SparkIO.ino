@@ -701,7 +701,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(preset->Description);
       read_string(preset->Icon);
       read_float(&preset->BPM);
-      read_byte(&num_effects);
+      read_byte(&num);
+      num_effects = num - 0x90;
       for (j=0; j < num_effects; j++) {
         read_string(preset->effects[j].EffectName);
         read_onoff(&preset->effects[j].OnOff);
@@ -1267,15 +1268,15 @@ void MessageOut::create_preset(SparkPreset *preset)
   write_string(preset->Icon);
   write_float (preset->BPM);
    
-  write_byte (byte(0x90 + 7));       // always 7 pedals
-  for (i=0; i<7; i++) {
+  write_byte (byte(0x90 + preset->num_effects));       // always 7 pedals
+  for (i = 0; i < preset->num_effects; i++) {
     write_string (preset->effects[i].EffectName);
     write_onoff(preset->effects[i].OnOff);
 
     siz = preset->effects[i].NumParameters;
     write_byte ( 0x90 + siz); 
       
-    for (j=0; j<siz; j++) {
+    for (j = 0; j < siz; j++) {
       write_byte (j);
       write_byte (byte(0x91));
       write_float (preset->effects[i].Parameters[j]);
