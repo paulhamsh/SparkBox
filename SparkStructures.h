@@ -13,6 +13,7 @@ typedef struct  {
   char Description[STR_LEN];
   char Icon[STR_LEN];
   float BPM;
+  uint8_t num_effects;
   struct SparkEffects {
     char EffectName[STR_LEN];
     bool OnOff;

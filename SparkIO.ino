@@ -557,6 +557,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   uint8_t junk;
   int i, j;
   uint8_t num, num1, num2;
+  uint8_t num_effects;
 
   if (in_message.is_empty()) return false;
 
@@ -700,8 +701,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(preset->Description);
       read_string(preset->Icon);
       read_float(&preset->BPM);
-
-      for (j=0; j < 7; j++) {
+      read_byte(&num_effects);
+      for (j=0; j < num_effects; j++) {
         read_string(preset->effects[j].EffectName);
         read_onoff(&preset->effects[j].OnOff);
         read_byte(&num);
@@ -730,10 +731,47 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0415:
     case 0x0438:
     case 0x0465:
+    case 0x0271:
+    case 0x0272:
+    case 0x0472: 
+    case 0x0474: 
     // Serial.print("Got an ack ");
     // Serial.println(cs, HEX);
       break;
 
+
+    // LIVE messages  
+
+    // Power Settings - Auto Standby and Auto Shutdown
+    //      boolean       ? (0xc2 = false)
+    //      byte          auto-shutdown time in minutes (0 = Never, 30, 40, 50, 60)
+    //      byte          ?
+    //      byte          auto standby time in minute (0 = Never, 5, 10, 15, 30)
+
+    case 0x0172:
+      read_onoff(&msg->bool1);
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_byte(&msg->param3);
+      break;
+
+    // Impedance
+    //      byte          0x91 - fixed array size 1
+    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 4=IN3/4
+    //      byte          0=Standard, 1=Hi-Z, 2=Line, 3=Mic
+
+    case 0x0174:
+      read_byte(&num);
+      read_uint(&msg->param1); // 0=IN1, 1=IN2 1/4, 2=IN2 XLR, 4=IN3/4
+      read_uint(&msg->param2); // 0=Standard, 1=Hi-Z, 2=Line, 3=Mic  
+      break;
+
+    case 0x022b:
+      read_uint(&msg->param1); 
+      break;
+
+
+    // NOT PROPOERLY FORMED BELOW HERE 
 
 
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
@@ -828,25 +866,14 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 */
 
     // unprocessed Spark GO/MINI messages
-    case 0x0272:
+
     case 0x0372:
-    case 0x0271:
     case 0x0304:
     case 0x0204:
       in_message.clear();
       break;
-    // Power Settings for MINI, GO, LIVE
-    case 0x0472:
-      DEBUG("undefined Power Settings");
-      in_message.clear();
-      break;
-    // LIVE INPUT Impedence
-    case 0x0474:
-      DEBUG("undefined LIVE Input Impedence");
-      in_message.clear();
-      break;
+
     // unprocessed LIVE Connection Messages
-    case 0x022b:
     case 0x032b:
       DEBUG("undefined LIVE connection messages");
       in_message.clear();
