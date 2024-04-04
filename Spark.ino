@@ -67,7 +67,38 @@ bool spark_state_tracker_start() {
   ble_passthru = true;
   // try to find and connect to Spark - returns false if failed to find Spark
   if (!connect_to_all()) return false;
-                
+
+  // handle different spark types
+  DEB("SPARK TYPE ");
+  switch (spark_type) {
+    case S40:
+      DEBUG("Spark 40");
+      break;
+    case GO:
+      DEBUG("Spark GO");
+      break;
+    case MINI:
+      DEBUG("Spark MINI");
+      break;
+    case LIVE:
+      DEBUG("Spark LIVE");
+      break;      
+  }
+
+  if (spark_type != LIVE) {
+    num_inputs = 1;
+    num_presets = 4;                   // default num_presets
+    current_preset_index = 5;          // default CUR_EDITING
+    temp_preset_index = 4;
+  }  
+  else {
+    num_inputs = 2;
+    num_presets = 8;                   // default num_presets
+    current_preset_index = 10;          // default CUR_EDITING
+    temp_preset_index = 9;
+  }
+
+
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
   spark_ping_timer = millis();
   selected_preset = 0;
@@ -103,18 +134,20 @@ bool spark_state_tracker_start() {
     spark_send();
     got = wait_for_spark(0x0301);
 
-    //pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
-    pres = preset.preset_num; // won't get an 0x7f
-    if (preset.curr_preset == 0x01) {
-      pres = current_preset_index;
-      got_all_presets = true;
-    }
-    presets[pres] = preset;
-    //dump_preset(&presets[pres]);
-
     if (got) {
+      //pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
+      pres = preset.preset_num; // won't get an 0x7f
+      if (preset.curr_preset == 0x01) {
+        pres = current_preset_index;
+        got_all_presets = true;
+      }
+      presets[pres] = preset;
+
+    //if (got) {
       DEB("Got preset: "); 
       DEBUG(pres);
+      dump_preset(presets[pres]);
+      
       preset_to_get++;
       if (preset_to_get == 4) preset_to_get = 0x0100;
     }

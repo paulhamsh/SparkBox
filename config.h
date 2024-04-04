@@ -26,10 +26,10 @@
 //#define DUMP_ON
 //
 // Uncomment for better Bluetooth compatibility with Android devices
-//#define CLASSIC
+#define CLASSIC
 //
 // Uncomment when using a Heltec module as their implementation doesn't support setMTU()
-#define HELTEC_WIFI
+//#define HELTEC_WIFI
 //
 // Choose and uncomment the type of OLED display used: 0.96" SSD1306 or 1.3" SH1106 
 #define SSD1306

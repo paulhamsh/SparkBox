@@ -435,6 +435,15 @@ bool connect_to_all() {
         DEBUG("Found ");
         DEBUG(spark_ble_name);
 
+        if (strcmp(spark_ble_name, "Spark 40 BLE") == 0) 
+          spark_type = S40;
+        else if (strcmp(spark_ble_name, "Spark GO BLE") == 0)
+          spark_type = GO;
+        else if (strcmp(spark_ble_name, "Spark MINI BLE") == 0)        
+          spark_type = MINI;  
+        else if (strcmp(spark_ble_name, "Spark LIVE BLE") == 0)     
+          spark_type = LIVE; 
+
         found_sp = true;
         connected_sp = false;
         sp_device = new BLEAdvertisedDevice(device);

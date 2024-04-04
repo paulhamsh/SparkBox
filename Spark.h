@@ -7,13 +7,13 @@
 unsigned int cmdsub;
 SparkMessage msg;
 SparkPreset preset;
-SparkPreset presets[12];
+SparkPreset presets[10];           // max 8 presets plus temp and current
 
 // Not used yet - will be though
-int num_presets = 4;                   // default num_presets
-int current_preset_index = 5;          // default CUR_EDITING
-int temp_preset_index = 4;
-int temp_preset_addr = 0x7f;
+int num_inputs;
+int num_presets;                   // default num_presets
+int current_preset_index;          // default CUR_EDITING
+int temp_preset_index;
 
 enum spark_status_values {SPARK_DISCONNECTED, SPARK_CONNECTED, SPARK_COMMUNICATING, SPARK_CHECKSUM, SPARK_SYNCING, SPARK_SYNCED};
 spark_status_values spark_state;
@@ -22,7 +22,7 @@ unsigned long spark_ping_timer;
 //SparkBox specific
 bool setting_modified = false;      // Flag that user has modifed a setting
 bool isTunerMode;                   // Tuner mode flag
-char param_str[STR_LEN];                 // 
+char param_str[STR_LEN];               
 int param = -1;
 uint8_t display_preset_num;         // Referenced preset number on Spark
 
