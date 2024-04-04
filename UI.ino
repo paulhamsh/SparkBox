@@ -326,7 +326,7 @@ void dump_preset(SparkPreset preset) {
   DEB(preset.Name); DEB(" ");
   DEBUG(preset.Description);
 
-  for (j=0; j<7; j++) {
+  for (j=0; j<preset.num_effects; j++) {
     DEB("    ");
     DEB(preset.effects[j].EffectName); DEB(" ");
     if (preset.effects[j].OnOff == true) DEB(" On "); else DEB (" Off ");
