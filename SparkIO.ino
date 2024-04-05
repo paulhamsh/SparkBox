@@ -778,14 +778,19 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
     // Not sure what this represents, but it is an array of: byte byte boolean
     case 0x031a:
+      DEB("LIVE message 0x031a   ");
       read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      DEB("Fixed array size: ");
+      DEBUG(num);
       // Assume size 2 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
       read_onoff(&msg->bool1);
       read_byte(&msg->param3);
       read_byte(&msg->param4);
-      read_onoff(&msg->bool2);   
+      read_onoff(&msg->bool2);  
+
       DEB("LIVE hardware preset channge ");
       DEB(msg->param1);
       DEB(" ");
@@ -794,7 +799,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB(msg->param3);
       DEB(" "); 
       DEB(msg->param4);
-      if (msg->bool2) DEB(" On "); else DEB(" Off ");   
+      if (msg->bool2) DEB(" On "); else DEB(" Off ");  
+      DEBUG(""); 
       in_message.clear();        // clear rest of message as we haven't used it
       break;
     // LIVE INPUT 1 Guitar Volume
@@ -820,7 +826,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param1);
       read_byte(&msg->param2);
       //DEBUG(msg->param1);
-     // DEBUG(msg->param1);
+      // DEBUG(msg->param1);
       in_message.clear();   // clear rest of message as we haven't used it
       break;
     case 0x0373:
