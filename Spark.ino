@@ -150,7 +150,7 @@ bool spark_state_tracker_start() {
       dump_preset(presets[pres][current_input]);
       
       preset_to_get++;
-      if (preset_to_get == max_preset) preset_to_get = 0x0100;
+      if (preset_to_get > max_preset) preset_to_get = 0x0100;
     }
     else {
       DEB("Missed preset: "); 
