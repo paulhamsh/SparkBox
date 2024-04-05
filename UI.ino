@@ -37,7 +37,7 @@ void frPresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16
   display->setFont(HUGE_FONT);
   int numW = display->getStringWidth((String)(display_preset_num + 1))+5;
   display->setFont(BIG_FONT);
-  int nameW = display->getStringWidth(presets[CUR_EDITING].Name)+5;
+  int nameW = display->getStringWidth(presets[CUR_EDITING][current_input].Name)+5;
   if (numW+nameW <= display->width()) {
     scroller = ( display->width() - numW ) / 2;
     display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -51,10 +51,10 @@ void frPresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16
       scrollCounter = millis() + 20;
     }
     display->setFont(BIG_FONT); // Draw a preset name
-    display->drawString( x + scroller - nameW , y + STATUS_HEIGHT, presets[CUR_EDITING].Name);
+    display->drawString( x + scroller - nameW , y + STATUS_HEIGHT, presets[CUR_EDITING][current_input].Name);
   }
   display->setFont(BIG_FONT); // Draw a preset name
-  display->drawString( x + scroller , y + STATUS_HEIGHT, presets[CUR_EDITING].Name);
+  display->drawString( x + scroller , y + STATUS_HEIGHT, presets[CUR_EDITING][current_input].Name);
   display->setColor(BLACK);
   display->fillRect(display->width()-numW+x+2, STATUS_HEIGHT+y, numW-2, display->height()-STATUS_HEIGHT);
   display->setFont(HUGE_FONT); // Gonna draw a preset number
@@ -82,7 +82,7 @@ void frEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(SMALL_FONT);
   int numW = display->getStringWidth((String)(display_preset_num + 1))+5;  // Width of the 1st string representing the preset number
-  int nameW = display->getStringWidth(presets[CUR_EDITING].Name)+5;       // Width of the 2nd string representing the name of the preset
+  int nameW = display->getStringWidth(presets[CUR_EDITING][current_input].Name)+5;       // Width of the 2nd string representing the name of the preset
   if (numW+nameW <= visibleW) {
     scroller = ( visibleW - numW - nameW ) / 2;
   } else {
@@ -94,10 +94,10 @@ void frEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16
       scrollCounter = millis() + 20;
     }
     display->drawString( visibleLeft + x + scroller - numW - nameW, y, (String)(display_preset_num + 1) ); // +1 for humans
-    display->drawString( visibleLeft + x + scroller - nameW, y, presets[CUR_EDITING].Name);
+    display->drawString( visibleLeft + x + scroller - nameW, y, presets[CUR_EDITING][current_input].Name);
   }
   display->drawString( visibleLeft + x + scroller, y, (String)(display_preset_num + 1) ); // +1 for humans
-  display->drawString( visibleLeft + x + scroller + numW, y, presets[CUR_EDITING].Name);
+  display->drawString( visibleLeft + x + scroller + numW, y, presets[CUR_EDITING][current_input].Name);
 }
 
 // BANK SELECT MODE =======================================================================
@@ -282,25 +282,25 @@ void mainIcons() {
 void fxIcons() {
   uint8_t conn_icons = inWifi ? 1 : 2;
   // Drive icon    
-  drawStatusIcon(dr_bits, dr_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1,                     0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING].effects[FX_DRIVE].OnOff);
+  drawStatusIcon(dr_bits, dr_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1,                     0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING][current_input].effects[FX_DRIVE].OnOff);
   // Mod icon
-  drawStatusIcon(md_bits, md_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+FX_ICON_WIDTH+1,     0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING].effects[FX_MOD].OnOff);
+  drawStatusIcon(md_bits, md_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+FX_ICON_WIDTH+1,     0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING][current_input].effects[FX_MOD].OnOff);
   // Delay icon
-  drawStatusIcon(dy_bits, dy_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+(FX_ICON_WIDTH+1)*2, 0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING].effects[FX_DELAY].OnOff);
+  drawStatusIcon(dy_bits, dy_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+(FX_ICON_WIDTH+1)*2, 0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING][current_input].effects[FX_DELAY].OnOff);
   // Reverb icon
-  drawStatusIcon(rv_bits, rv_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+(FX_ICON_WIDTH+1)*3, 0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING].effects[FX_REVERB].OnOff);
+  drawStatusIcon(rv_bits, rv_width, STATUS_HEIGHT, conn_icons*(CONN_ICON_WIDTH+1)+1+(FX_ICON_WIDTH+1)*3, 0, FX_ICON_WIDTH,  STATUS_HEIGHT, presets[CUR_EDITING][current_input].effects[FX_REVERB].OnOff);
 }
 
 // Draw the big on/off icons for the EFFECTS mode
 void fxHugeIcons(int x, int y) {
   // Drive icon    
-  drawTextIcon("Dr", x+0,  y+18, 30, 32, presets[CUR_EDITING].effects[FX_DRIVE].OnOff, MEDIUM_FONT);
+  drawTextIcon("Dr", x+0,  y+18, 30, 32, presets[CUR_EDITING][current_input].effects[FX_DRIVE].OnOff, MEDIUM_FONT);
   // Mod icon
-  drawTextIcon("Md", x+32, y+18, 30, 32, presets[CUR_EDITING].effects[FX_MOD].OnOff, MEDIUM_FONT);
+  drawTextIcon("Md", x+32, y+18, 30, 32, presets[CUR_EDITING][current_input].effects[FX_MOD].OnOff, MEDIUM_FONT);
   // Delay icon
-  drawTextIcon("Dy", x+64, y+18, 30, 32, presets[CUR_EDITING].effects[FX_DELAY].OnOff, MEDIUM_FONT);
+  drawTextIcon("Dy", x+64, y+18, 30, 32, presets[CUR_EDITING][current_input].effects[FX_DELAY].OnOff, MEDIUM_FONT);
   // Reverb icon
-  drawTextIcon("Rv", x+96, y+18, 30, 32, presets[CUR_EDITING].effects[FX_REVERB].OnOff, MEDIUM_FONT);
+  drawTextIcon("Rv", x+96, y+18, 30, 32, presets[CUR_EDITING][current_input].effects[FX_REVERB].OnOff, MEDIUM_FONT);
 }
 
 void hintIcons(int x, int y) {
@@ -345,7 +345,7 @@ void changeKnobFx(int changeDirection=1) {
   curFx = knobs_order[curKnob].fxSlot;
   curParam = knobs_order[curKnob].fxNumber;
   fxCaption = spark_knobs[curFx][curParam];
-  level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * MAX_LEVEL;
+  level = presets[CUR_EDITING][current_input].effects[curFx].Parameters[curParam] * MAX_LEVEL;
   timeToGoBack = millis() + actual_timeout;
   DEBUG(curKnob);
 }
@@ -552,7 +552,7 @@ void onClick(uint8_t buttonMask) {
     curFx = knobs_order[curKnob].fxSlot;
     curParam = knobs_order[curKnob].fxNumber;
     fxCaption = spark_knobs[curFx][curParam];
-    level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * MAX_LEVEL;
+    level = presets[CUR_EDITING][current_input].effects[curFx].Parameters[curParam] * MAX_LEVEL;
     DEBUG(level);
     if (buttonMask==8) {
       level=level+1;
@@ -563,7 +563,7 @@ void onClick(uint8_t buttonMask) {
     }
     float newVal = (float)level/(float)MAX_LEVEL + 0.005;
     change_generic_param(curFx, curParam, newVal);
-    presets[CUR_EDITING].effects[curFx].Parameters[curParam] = newVal;
+    presets[CUR_EDITING][current_input].effects[curFx].Parameters[curParam] = newVal;
   } else if (curMode == MODE_LEVEL && buttonMask == 1) {
     changeKnobFx();
   } else if (curMode == MODE_BANKS && buttonMask == 2) {
@@ -631,11 +631,11 @@ void onLongPress(uint8_t buttonMask) {
             curFx = knobs_order[curKnob].fxSlot;
             curParam = knobs_order[curKnob].fxNumber;
             fxCaption = spark_knobs[curFx][curParam];
-            level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * MAX_LEVEL;
+            level = presets[CUR_EDITING][current_input].effects[curFx].Parameters[curParam] * MAX_LEVEL;
             tempFrame(MODE_LEVEL, curMode, FRAME_TIMEOUT); // Master level adj
           } else {
             tempUI=false;
-            change_custom_preset(&presets[CUR_EDITING], display_preset_num);
+            change_custom_preset(&presets[CUR_EDITING][current_input], display_preset_num);
             showMessage("DONE!", "CHANGES", "SAVED TO AMP", 1000);
           }
           break;
@@ -1141,7 +1141,7 @@ void toggleBypass() {
 void bypassOn() {
   if (curMode != MODE_BYPASS) {
     for (int i=0; i<=6; i++){
-      fxState[i] = presets[CUR_EDITING].effects[i].OnOff;
+      fxState[i] = presets[CUR_EDITING][current_input].effects[i].OnOff;
       change_generic_onoff(i, false);
     }
     tempUI = false;
@@ -1154,7 +1154,7 @@ void bypassOn() {
 void bypassOff() {
   if (curMode == MODE_BYPASS) {
     for (int i=0; i<=6; i++){
-      presets[CUR_EDITING].effects[i].OnOff = fxState[i];
+      presets[CUR_EDITING][current_input].effects[i].OnOff = fxState[i];
       change_generic_onoff(i, fxState[i]);
     }
     curMode = returnMode;
@@ -1263,7 +1263,7 @@ void doExpressionPedal() {
 // We need to know which effects are on and which are off to draw icons
 void updateFxStatuses() {
   for (int i=0 ; i< NUM_SWITCHES; i++) {
-    SWITCHES[i].fxOnOff = presets[CUR_EDITING].effects[SWITCHES[i].fxSlotNumber].OnOff;
+    SWITCHES[i].fxOnOff = presets[CUR_EDITING][current_input].effects[SWITCHES[i].fxSlotNumber].OnOff;
   }
 }
 
@@ -1284,15 +1284,15 @@ void uploadPreset(int presetNum) {
   if (presetNum < HW_PRESETS ) {
     change_hardware_preset(presetNum);
     remotePresetNum = presetNum;
-    presets[CUR_EDITING] = presets[presetNum];
+    presets[CUR_EDITING][current_input] = presets[presetNum][current_input];
   } else {
     remotePresetNum = TMP_PRESET_ADDR;
   //  preset = flashPresets[presetNum-HW_PRESETS];
     DEBUG(">>>>>uploading '" + (String)(preset.Name) + "' to 0x007f");
     // change preset.number to 0x007f
     preset.preset_num = TMP_PRESET_ADDR;
-    presets[TMP_PRESET] = preset;
-    presets[CUR_EDITING] = preset;
+    presets[TMP_PRESET][current_input] = preset;
+    presets[CUR_EDITING][current_input] = preset;
     change_custom_preset(&preset, TMP_PRESET_ADDR);
   }
   updateFxStatuses();
@@ -1302,16 +1302,16 @@ void uploadPreset(int presetNum) {
 void uploadBankPresets(int bankNum) {
   if (bankNum >= 0) {
     for (int i=0; i<4; i++) {
-      preset = presets[i];
+      preset = presets[i][current_input];
       preset.preset_num = i;
       DEB("Sending Preset ");
       DEBUG(i);
       change_custom_preset(&preset, i);
     }
     display_preset_num = bankConfig[bankNum].start_chan;
-    preset = presets[display_preset_num];
-    presets[TMP_PRESET] = preset;
-    presets[CUR_EDITING] = preset;
+    preset = presets[display_preset_num][current_input];
+    presets[TMP_PRESET][current_input] = preset;
+    presets[CUR_EDITING][current_input] = preset;
     DEB("Sending Preset ");
     DEBUG(TMP_PRESET_ADDR);
     change_custom_preset(&preset, TMP_PRESET_ADDR);
@@ -1344,7 +1344,7 @@ void loadBankPresets(int bankNum) {
         if (String(file.name()).endsWith(".json")) {
           DEB(i);
           DEB(": parsing preset ");
-          parseJsonPreset(file, presets[i]);
+          parseJsonPreset(file, presets[i][current_input]);
           bankPresetFiles[i] = file.name();
           i++;
           file.close();
@@ -1356,14 +1356,14 @@ void loadBankPresets(int bankNum) {
     }
     // if there're not enough json presets in the bank folder
     while (i<4) {
-      presets[i] = somePreset("rnd_");
+      presets[i][current_input] = somePreset("rnd_");
       bankPresetFiles[i] = "rnd_chn_" + String(i) + ".json";
-      savePresetToFile(presets[i], bankPresetFiles[i]);
+      savePresetToFile(presets[i][current_input], bankPresetFiles[i]);
       i++;
     }
   } else {
     for (int i = 0; i < 5 ; i++) {
-      presets[i] = presets[i];
+      presets[i][current_input] = presets[i][current_input];
     }
   }
   localBankNum = bankNum;

@@ -76,7 +76,7 @@ int count;                          // "
 bool flash_GUI;                     // Flash GUI items if true
 //bool isTunerMode;                   // Tuner mode flag
 bool scan_result = false;           // Connection attempt result
-enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET, CUR_EDITING, TMP_PRESET_ADDR=0x007f};
+enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET=8, CUR_EDITING=9, TMP_PRESET_ADDR=0x007f};
 enum eEffects_t {FX_GATE, FX_COMP, FX_DRIVE, FX_AMP, FX_MOD, FX_DELAY, FX_REVERB};
 #ifdef ACTIVE_HIGH
   uint8_t logicON = HIGH;
@@ -282,7 +282,7 @@ void loop() {
         pedalCfg.active_bank = localBankNum;
         for (int i = 0; i < 4; i++) {
           DEBUG("Saving h/w preset " + String(i));
-          savePresetToFile(presets[i], "/bank_000/hw_" + String(i) + ".json");
+          savePresetToFile(presets[i][current_input], "/bank_000/hw_" + String(i) + ".json");
         }
       }
       got_presets = true;
@@ -332,7 +332,7 @@ void loop() {
     if (cmdsub == 0x0337 || cmdsub == 0x0104) {
       DEBUG("Change parameter ");
       int fxSlot = fxNumByName(msg.str1).fxSlot;
-      presets[CUR_EDITING].effects[fxSlot].Parameters[msg.param1] = msg.val;
+      presets[CUR_EDITING][current_input].effects[fxSlot].Parameters[msg.param1] = msg.val;
       fxCaption = spark_knobs[fxSlot][msg.param1];
       if (fxSlot==5 && msg.param1==4){
         //suppress the message "BPM=10.0"

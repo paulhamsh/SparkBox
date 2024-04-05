@@ -7,11 +7,13 @@
 unsigned int cmdsub;
 SparkMessage msg;
 SparkPreset preset;
-SparkPreset presets[10];           // max 8 presets plus temp and current
+SparkPreset presets[10][2];           // max 8 presets plus temp and current
 
-// Not used yet - will be though
+int current_input = 0;
+
 int num_inputs;
 int num_presets;                   // default num_presets
+int max_preset;
 int current_preset_index;          // default CUR_EDITING
 int temp_preset_index;
 
