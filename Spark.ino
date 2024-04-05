@@ -170,6 +170,7 @@ bool spark_state_tracker_start() {
 
 bool  update_spark_state() {
   int pres, ind;
+  int input;
   
   // sort out connection and sync progress
   if (!ble_spark_connected) {
@@ -204,10 +205,15 @@ bool  update_spark_state() {
         pres = (preset.preset_num == 0x7f) ? temp_preset_index : preset.preset_num;
         if (preset.curr_preset == 0x01)
           pres = current_preset_index;
-        presets[pres][current_input] = preset;
+        input = (current_preset_index < 2);     // this makes input either 0 for 0x00 and 0x01 or 1 for 0x03 and 0x04
+        presets[pres][input] = preset;          // don't use current input to store
         //dump_preset(&presets[pres]);
         DEB("Got preset ");
-        DEBUG(pres);
+        DEB(pres);
+        DEB(" = ");
+        DEB(preset.curr_preset);
+        DEB(" : ");
+        DEBUG(preset.preset_num);
         break;
       // change of amp model
       case 0x0306:
