@@ -210,6 +210,8 @@ bool  update_spark_state() {
         //dump_preset(&presets[pres]);
         DEB("Got preset ");
         DEB(pres);
+        DEB(" ");
+        DEB(input);
         DEB(" = ");
         DEB(preset.curr_preset);
         DEB(" : ");
