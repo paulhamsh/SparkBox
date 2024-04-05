@@ -778,11 +778,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
     // Not sure what this represents, but it is an array of: byte byte boolean
     case 0x031a:
-      DEBUG("LIVE message 0x031a");
       read_byte(&num);
-      num -= 0x90;  // should be a fixed array
-      DEB("Fixed array size: ");
-      DEBUG(num);
       // Assume size 2 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
@@ -790,38 +786,41 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
       read_byte(&msg->param4);
       read_onoff(&msg->bool2);   
-      DEBUG(msg->param1);
-      DEBUG(msg->param2);
-      if (msg->bool1) DEBUG("On"); else DEBUG("Off");
-      DEBUG(msg->param3);
-      DEBUG(msg->param4);
-      if (msg->bool2) DEBUG("On"); else DEBUG("Off");
-      in_message.clear();   // clear rest of message as we haven't used it
+      DEB("LIVE hardware preset channge ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEB(msg->param2);
+      if (msg->bool1) DEB(" On "); else DEB(" Off ");
+      DEB(msg->param3);
+      DEB(" "); 
+      DEB(msg->param4);
+      if (msg->bool2) DEB(" On "); else DEB(" Off ");   
+      in_message.clear();        // clear rest of message as we haven't used it
       break;
     // LIVE INPUT 1 Guitar Volume
     case 0x036b:
-      DEB("LIVE INPUT 1 Guitar Volume ");
+      //DEB("LIVE INPUT 1 Guitar Volume ");
       read_float(&msg->val);
-      DEBUG(msg->val);
+      //DEBUG(msg->val);
       break;
     // LIVE Mixer
     case 0x0333:
-      DEB("LIVE Mixer ");
+      //DEB("LIVE Mixer ");
       read_float(&msg->val);
-      DEBUG(msg->val);
+     // DEBUG(msg->val);
       break;
     // LIVE INPUT 2 Cable Insert
     case 0x0374:
       DEB("LIVE INPUT 2 Cable Insert");
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
-      DEB("Fixed array size: ");
-      DEBUG(num);
+      //DEB("Fixed array size: ");
+      //DEBUG(num);
       // Assume size 1 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
-      DEBUG(msg->param1);
-      DEBUG(msg->param1);
+      //DEBUG(msg->param1);
+     // DEBUG(msg->param1);
       in_message.clear();   // clear rest of message as we haven't used it
       break;
     case 0x0373:

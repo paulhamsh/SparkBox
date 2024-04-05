@@ -205,7 +205,7 @@ bool  update_spark_state() {
         pres = (preset.preset_num == 0x7f) ? temp_preset_index : preset.preset_num;
         if (preset.curr_preset == 0x01)
           pres = current_preset_index;
-        input = (current_preset_index < 2);     // this makes input either 0 for 0x00 and 0x01 or 1 for 0x03 and 0x04
+        input = (preset.curr_preset > 2);     // this makes input either 0 for 0x00 and 0x01 or 1 for 0x03 and 0x04
         presets[pres][input] = preset;          // don't use current input to store
         //dump_preset(&presets[pres]);
         DEB("Got preset ");
