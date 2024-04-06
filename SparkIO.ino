@@ -777,7 +777,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       break;
 
     // Mixer
-    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 3=IN3, 4 = IN4, 9 = MASTER
+    //      byte          0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 3 = IN3, 4 = IN4, 5= MUSIC, 9 = MASTER
     //      float         value
 
     case 0x0133:
