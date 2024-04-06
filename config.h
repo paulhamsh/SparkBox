@@ -26,7 +26,7 @@
 //#define DUMP_ON
 //
 // Uncomment for better Bluetooth compatibility with Android devices
-#define CLASSIC
+//#define CLASSIC
 //
 // Uncomment when using a Heltec module as their implementation doesn't support setMTU()
 //#define HELTEC_WIFI

@@ -582,7 +582,6 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   *cmdsub = cs;
   switch (cs) {
     case 0x0000:
-      DEBUG("GOT MESSAGE 0x0000 !!!"); 
       break;
     // 0x02 series - requests
     // get preset information
@@ -761,7 +760,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 
     // Impedance
     //      byte          0x91 - fixed array size 1
-    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 4=IN3/4
+    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 3=IN3, 4 = IN4
     //      byte          0=Standard, 1=Hi-Z, 2=Line, 3=Mic
 
     case 0x0174:
@@ -770,8 +769,26 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_uint(&msg->param2); // 0=Standard, 1=Hi-Z, 2=Line, 3=Mic  
       break;
 
+    // UNKNOWN
+    //      byte          ?
+
     case 0x022b:
       read_uint(&msg->param1); 
+      break;
+
+    // Mixer
+    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 3=IN3, 4 = IN4, 9 = MASTER
+    //      float         value
+
+    case 0x0133:
+      read_uint(&msg->param1); 
+      read_float(&msg->val);
+
+      DEB("MIXER change Channel ");
+      DEB(msg->param1);
+      DEB(" Value: ");
+      DEBUG(msg->val);
+
       break;
 
     // NOT PROPOERLY FORMED BELOW HERE 
@@ -779,11 +796,12 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
     // Not sure what this represents, but it is an array of: byte byte boolean
     case 0x031a:
-      DEB("LIVE message 0x031a   ");
+      DEB("LIVE hardware preset change 0x031a   ");
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
       DEB("Fixed array size: ");
-      DEBUG(num);
+      DEB(num);
+      DEB(" ");
       // Assume size 2 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
@@ -792,15 +810,14 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param4);
       read_onoff(&msg->bool2);  
 
-      DEB("LIVE hardware preset change ");
       DEB(msg->param1);
       DEB(" ");
       DEB(msg->param2);
-      if (msg->bool1) DEB(" On "); else DEB(" Off ");
+      if (msg->bool1) DEB(" Unsaved changes "); else DEB(" Unchanged ");
       DEB(msg->param3);
       DEB(" "); 
       DEB(msg->param4);
-      if (msg->bool2) DEB(" On "); else DEB(" Off ");  
+      if (msg->bool2) DEB(" Unsaved changes"); else DEB(" Unchanged ");  
       DEBUG(""); 
       in_message.clear();        // clear rest of message as we haven't used it
       break;

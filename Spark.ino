@@ -378,10 +378,18 @@ void update_ui_hardware() {
   }
 }
 
+
+void set_input1() {
+  if (spark_type == LIVE) {
+    spark_msg_out.select_live_input_1();
+    spark_send();
+  }
+}
 ///// ROUTINES TO CHANGE AMP SETTINGS
 
 void change_generic_model(char *new_eff, int slot) {
   if (strcmp(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff) != 0) {
+    set_input1();
     spark_msg_out.change_effect(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff);
     strcpy(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff);
     spark_send();
@@ -419,6 +427,7 @@ void change_delay_model(char *new_eff) {
 
 
 void change_generic_onoff(int slot,bool onoff) {
+  
   spark_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, onoff);
   app_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, onoff);
   presets[current_preset_index][current_input].effects[slot].OnOff = onoff;
