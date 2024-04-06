@@ -49,6 +49,7 @@ class MessageOut
     void write_onoff(bool onoff);
     void write_uint32(uint32_t w);
 
+    void select_live_input_1();
     void create_preset(SparkPreset *preset);
     void turn_effect_onoff(char *pedal, bool onoff);
     void change_hardware_preset(uint8_t curr_preset, uint8_t preset_num);
