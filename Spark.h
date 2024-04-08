@@ -14,8 +14,10 @@ int current_input = 0;
 int num_inputs;
 int num_presets;                   // default num_presets
 int max_preset;
-int current_preset_index;          // default CUR_EDITING
-int temp_preset_index;
+//int current_preset_index;          // default CUR_EDITING
+//int temp_preset_index;
+
+enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET=8, CUR_EDITING=9, TMP_PRESET_ADDR=0x007f};
 
 enum spark_status_values {SPARK_DISCONNECTED, SPARK_CONNECTED, SPARK_COMMUNICATING, SPARK_CHECKSUM, SPARK_SYNCING, SPARK_SYNCED};
 spark_status_values spark_state;

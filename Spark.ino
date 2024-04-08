@@ -18,7 +18,7 @@ int get_effect_index(char *str) {
 
   ind = -1;
   for (i = 0; ind == -1 && i <= 6; i++) {
-    if (strcmp(presets[current_preset_index][current_input].effects[i].EffectName, str) == 0) {
+    if (strcmp(presets[CUR_EDITING][current_input].effects[i].EffectName, str) == 0) {
       ind  = i;
     }
   }
@@ -93,15 +93,11 @@ bool spark_state_tracker_start() {
     num_inputs = 1;
     num_presets = 4;                 
     max_preset = 3;
-    current_preset_index = 9;         
-    temp_preset_index = 8;
   }  
   else {
     num_inputs = 2;
     num_presets = 8;          
     max_preset = 7;
-    current_preset_index = 9;        
-    temp_preset_index = 8;
   }
 
 
@@ -142,7 +138,7 @@ bool spark_state_tracker_start() {
     if (got) {
       pres = preset.preset_num; // won't get an 0x7f
       if (preset.curr_preset == 0x01) {
-        pres = current_preset_index;
+        pres = CUR_EDITING;
         got_all_presets = true;
       }
       presets[pres][current_input] = preset;
@@ -173,7 +169,7 @@ bool spark_state_tracker_start() {
     if (got) {
       pres = preset.preset_num; // won't get an 0x7f
       if (preset.curr_preset == 0x04) {
-        pres = current_preset_index;
+        pres = CUR_EDITING;
         got_all_presets = true;
       }
       presets[pres][current_input] = preset;
@@ -238,9 +234,9 @@ bool  update_spark_state() {
       // full preset details
       case 0x0301:  
       case 0x0101:
-        pres = (preset.preset_num == 0x7f) ? temp_preset_index : preset.preset_num;
+        pres = (preset.preset_num == 0x7f) ? TMP_PRESET : preset.preset_num;
         if (preset.curr_preset == 0x01 || preset.curr_preset == 0x04)
-          pres = current_preset_index;
+          pres = CUR_EDITING;
         input = (preset.curr_preset > 2);     // this makes input either 0 for 0x00 and 0x01 or 1 for 0x03 and 0x04
         presets[pres][input] = preset;          // don't use current input to store
         //dump_preset(&presets[pres]);
@@ -255,13 +251,13 @@ bool  update_spark_state() {
         break;
       // change of amp model
       case 0x0306:
-        strcpy(presets[current_preset_index][current_input].effects[3].EffectName, msg.str2);
+        strcpy(presets[CUR_EDITING][current_input].effects[3].EffectName, msg.str2);
         break;
       // change of effect
       case 0x0106:
         ind = get_effect_index(msg.str1);
         if (ind >= 0) 
-          strcpy(presets[current_preset_index][current_input].effects[ind].EffectName, msg.str2);
+          strcpy(presets[CUR_EDITING][current_input].effects[ind].EffectName, msg.str2);
           setting_modified = true;
         break;
       // effect on/off  
@@ -269,7 +265,7 @@ bool  update_spark_state() {
       case 0x0115:
         ind = get_effect_index(msg.str1);
         if (ind >= 0) 
-          presets[current_preset_index][current_input].effects[ind].OnOff = msg.onoff;
+          presets[CUR_EDITING][current_input].effects[ind].OnOff = msg.onoff;
           setting_modified = true;
         break;
       // change parameter value  
@@ -277,7 +273,7 @@ bool  update_spark_state() {
       case 0x0104:
         ind = get_effect_index(msg.str1);
         if (ind >= 0)
-          presets[current_preset_index][current_input].effects[ind].Parameters[msg.param1] = msg.val;
+          presets[CUR_EDITING][current_input].effects[ind].Parameters[msg.param1] = msg.val;
         setting_modified = true;  
         // SparkBox specific
         strcpy(param_str, msg.str1);
@@ -286,8 +282,8 @@ bool  update_spark_state() {
       // change to preset  
       case 0x0338:
       case 0x0138:
-        selected_preset = (msg.param2 == 0x7f) ? temp_preset_index : msg.param2;
-        presets[current_preset_index][current_input] = presets[selected_preset][current_input];
+        selected_preset = (msg.param2 == 0x7f) ? TMP_PRESET : msg.param2;
+        presets[CUR_EDITING][current_input] = presets[selected_preset][current_input];
         setting_modified = false;
         // SparkBox specific
         // Only update the displayed preset number for HW presets
@@ -300,8 +296,8 @@ bool  update_spark_state() {
         break; 
       // store to preset  
       case 0x0327:
-        selected_preset = (msg.param2 == 0x7f) ? temp_preset_index : msg.param2;
-        presets[selected_preset][current_input] = presets[current_preset_index][current_input];
+        selected_preset = (msg.param2 == 0x7f) ? TMP_PRESET : msg.param2;
+        presets[selected_preset][current_input] = presets[CUR_EDITING][current_input];
         setting_modified = false;
         // SparkBox specific
         // Only update the displayed preset number for HW presets
@@ -311,10 +307,10 @@ bool  update_spark_state() {
         break;
       // current selected preset
       case 0x0310:
-        selected_preset = (msg.param2 == 0x7f) ? temp_preset_index : msg.param2;
+        selected_preset = (msg.param2 == 0x7f) ? TMP_PRESET : msg.param2;
         if (msg.param1 == 0x01) 
-          selected_preset = current_preset_index;
-        presets[current_preset_index][current_input] = presets[selected_preset][current_input];
+          selected_preset = CUR_EDITING;
+        presets[CUR_EDITING][current_input] = presets[selected_preset][current_input];
         // SparkBox specific
         // Only update the displayed preset number for HW presets
         if (selected_preset < num_presets){
@@ -356,11 +352,11 @@ void update_ui() {
     DEBUG("Updating UI");
     got = wait_for_app(0x0201);
     if (got) {
-      strcpy(presets[current_preset_index][current_input].Name, "SyncPreset");
-      strcpy(presets[current_preset_index][current_input].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
-      presets[current_preset_index][current_input].curr_preset = 0x00;
-      presets[current_preset_index][current_input].preset_num = 0x03;
-      app_msg_out.create_preset(&presets[current_preset_index][current_input]);
+      strcpy(presets[CUR_EDITING][current_input].Name, "SyncPreset");
+      strcpy(presets[CUR_EDITING][current_input].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
+      presets[CUR_EDITING][current_input].curr_preset = 0x00;
+      presets[CUR_EDITING][current_input].preset_num = 0x03;
+      app_msg_out.create_preset(&presets[CUR_EDITING][current_input]);
       app_send();
       delay(100);
       app_msg_out.change_hardware_preset(0x00, 0x00);
@@ -424,10 +420,10 @@ void set_input1() {
 ///// ROUTINES TO CHANGE AMP SETTINGS
 
 void change_generic_model(char *new_eff, int slot) {
-  if (strcmp(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff) != 0) {
+  if (strcmp(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff) != 0) {
     set_input1();
-    spark_msg_out.change_effect(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff);
-    strcpy(presets[current_preset_index][current_input].effects[slot].EffectName, new_eff);
+    spark_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff);
+    strcpy(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff);
     spark_send();
     delay(100);
   }
@@ -442,10 +438,10 @@ void change_drive_model(char *new_eff) {
 }
 
 void change_amp_model(char *new_eff) {
-  if (strcmp(presets[current_preset_index][current_input].effects[3].EffectName, new_eff) != 0) {
-    spark_msg_out.change_effect(presets[current_preset_index][current_input].effects[3].EffectName, new_eff);
-    app_msg_out.change_effect(presets[current_preset_index][current_input].effects[3].EffectName, new_eff);
-    strcpy(presets[current_preset_index][current_input].effects[3].EffectName, new_eff);
+  if (strcmp(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff) != 0) {
+    spark_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
+    app_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
+    strcpy(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
     spark_send();
     app_send();
     delay(100);
@@ -464,9 +460,9 @@ void change_delay_model(char *new_eff) {
 
 void change_generic_onoff(int slot,bool onoff) {
   
-  spark_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, onoff);
-  app_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, onoff);
-  presets[current_preset_index][current_input].effects[slot].OnOff = onoff;
+  spark_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff);
+  app_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff);
+  presets[CUR_EDITING][current_input].effects[slot].OnOff = onoff;
   spark_send();
   app_send();  
 }
@@ -503,11 +499,11 @@ void change_reverb_onoff(bool onoff) {
 void change_generic_toggle(int slot) {
   bool new_onoff;
 
-  new_onoff = !presets[current_preset_index][current_input].effects[slot].OnOff;
+  new_onoff = !presets[CUR_EDITING][current_input].effects[slot].OnOff;
   
-  spark_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, new_onoff);
-  app_msg_out.turn_effect_onoff(presets[current_preset_index][current_input].effects[slot].EffectName, new_onoff);
-  presets[current_preset_index][current_input].effects[slot].OnOff = new_onoff;
+  spark_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff);
+  app_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff);
+  presets[CUR_EDITING][current_input].effects[slot].OnOff = new_onoff;
   spark_send();
   app_send();  
 }
@@ -545,12 +541,12 @@ void change_generic_param(int slot, int param, float val) {
   float diff;
 
   // some code to reduce the number of changes
-  diff = presets[current_preset_index][current_input].effects[slot].Parameters[param] - val;
+  diff = presets[CUR_EDITING][current_input].effects[slot].Parameters[param] - val;
   if (diff < 0) diff = -diff;
   if (diff > 0.04) {
-    spark_msg_out.change_effect_parameter(presets[current_preset_index][current_input].effects[slot].EffectName, param, val);
-    app_msg_out.change_effect_parameter(presets[current_preset_index][current_input].effects[slot].EffectName, param, val);
-    presets[current_preset_index][current_input].effects[slot].Parameters[param] = val;
+    spark_msg_out.change_effect_parameter(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val);
+    app_msg_out.change_effect_parameter(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val);
+    presets[CUR_EDITING][current_input].effects[slot].Parameters[param] = val;
     spark_send();  
     app_send();
   }
@@ -587,7 +583,7 @@ void change_reverb_param(int param, float val){
 
 void change_hardware_preset(int pres_num) {
   if (pres_num >= 0 && pres_num <= 3) {  
-    presets[current_preset_index][current_input] = presets[pres_num][current_input];
+    presets[CUR_EDITING][current_input] = presets[pres_num][current_input];
     
     spark_msg_out.change_hardware_preset(0, pres_num);
     app_msg_out.change_hardware_preset(0, pres_num);  
@@ -599,7 +595,7 @@ void change_hardware_preset(int pres_num) {
 void change_custom_preset(SparkPreset *preset, int pres_num) {
   if (pres_num >= 0 && pres_num <= max_preset) {
     preset->preset_num = (pres_num < num_presets) ? pres_num : 0x7f;
-    presets[current_preset_index][current_input] = *preset;
+    presets[CUR_EDITING][current_input] = *preset;
     presets[pres_num][current_input] = *preset;
     
     spark_msg_out.create_preset(preset);

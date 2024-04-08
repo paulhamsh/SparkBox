@@ -76,7 +76,7 @@ int count;                          // "
 bool flash_GUI;                     // Flash GUI items if true
 //bool isTunerMode;                   // Tuner mode flag
 bool scan_result = false;           // Connection attempt result
-enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET=8, CUR_EDITING=9, TMP_PRESET_ADDR=0x007f};
+//enum ePresets_t {HW_PRESET_0, HW_PRESET_1, HW_PRESET_2, HW_PRESET_3, TMP_PRESET=8, CUR_EDITING=9, TMP_PRESET_ADDR=0x007f};
 enum eEffects_t {FX_GATE, FX_COMP, FX_DRIVE, FX_AMP, FX_MOD, FX_DELAY, FX_REVERB};
 #ifdef ACTIVE_HIGH
   uint8_t logicON = HIGH;
