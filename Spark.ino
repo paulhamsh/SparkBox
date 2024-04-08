@@ -63,6 +63,9 @@ bool spark_state_tracker_start() {
   bool got;
   int pres;
 
+  int preset_to_get;
+  bool got_all_presets;
+
   spark_state = SPARK_DISCONNECTED;
   ble_passthru = true;
   // try to find and connect to Spark - returns false if failed to find Spark
@@ -129,8 +132,8 @@ bool spark_state_tracker_start() {
 
 
   // Get the presets
-  int preset_to_get = 0;
-  bool got_all_presets = false;
+  preset_to_get = 0x0000;
+  got_all_presets = false;
   while (!got_all_presets) {
     spark_msg_out.get_preset_details(preset_to_get);
     spark_send();
@@ -157,6 +160,39 @@ bool spark_state_tracker_start() {
       DEBUG(preset_to_get);
     };
   }
+
+  if (spark_type == LIVE) got_all_presets = false;
+
+  // Get the presets from INPUT 2 on LIVE
+  preset_to_get = 0x0300;    // The LIVE presets
+  while (!got_all_presets) {
+    spark_msg_out.get_preset_details(preset_to_get);
+    spark_send();
+    got = wait_for_spark(0x0301);
+
+    if (got) {
+      pres = preset.preset_num; // won't get an 0x7f
+      if (preset.curr_preset == 0x04) {
+        pres = current_preset_index;
+        got_all_presets = true;
+      }
+      presets[pres][current_input] = preset;
+
+    //if (got) {
+      DEB("Got preset: "); 
+      DEBUG(pres);
+      dump_preset(presets[pres][current_input]);
+      
+      preset_to_get++;
+      if (preset_to_get > max_preset) preset_to_get = 0x0400;
+    }
+    else {
+      DEB("Missed preset: "); 
+      DEBUG(preset_to_get);
+    };
+  }
+
+
   spark_state = SPARK_SYNCED;
   DEBUG("End of setup");
 
