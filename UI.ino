@@ -326,7 +326,7 @@ void dump_preset(SparkPreset preset) {
   DEB(preset.Name); DEB(" ");
   DEBUG(preset.Description);
 
-  for (j=0; j < 7; j++) {
+  for (j=0; j < preset.num_effects; j++) {
     DEB("    ");
     DEB(preset.effects[j].EffectName); DEB(" ");
     if (preset.effects[j].OnOff == true) DEB(" On "); else DEB (" Off ");
@@ -1404,7 +1404,9 @@ void dump_preset_detail(SparkPreset pre)
   DEBUG(pre.Icon);
   DEB("BPM:         ");
   DEBUG(pre.BPM);
-  for (i = 0; i<7; i++) {
+  DEB("Number of effects:         ");
+  DEBUG(pre.num_effects);  
+  for (i = 0; i<pre.num_effects; i++) {
     DEB("Effect ");
     DEB(i);
     DEB(": ");

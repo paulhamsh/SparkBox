@@ -704,6 +704,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_float(&preset->BPM);
       read_byte(&num);
       num_effects = num - 0x90;
+      preset->num_effects = num_effects;
       for (j=0; j < num_effects; j++) {
         read_string(preset->effects[j].EffectName);
         read_onoff(&preset->effects[j].OnOff);
