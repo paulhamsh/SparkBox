@@ -141,12 +141,12 @@ bool spark_state_tracker_start() {
         pres = CUR_EDITING;
         got_all_presets = true;
       }
-      presets[pres][current_input] = preset;
+      presets[pres][0] = preset;
 
     //if (got) {
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][current_input]);
+      dump_preset(presets[pres][0]);
       
       preset_to_get++;
       if (preset_to_get > max_preset) preset_to_get = 0x0100;
@@ -172,12 +172,12 @@ bool spark_state_tracker_start() {
         pres = CUR_EDITING;
         got_all_presets = true;
       }
-      presets[pres][current_input] = preset;
+      presets[pres][1] = preset;
 
     //if (got) {
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][current_input]);
+      dump_preset(presets[pres][1]);
       
       preset_to_get++;
       if (preset_to_get > max_preset) preset_to_get = 0x0400;
