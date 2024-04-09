@@ -52,9 +52,12 @@ class MessageOut
     void select_live_input_1();
     void create_preset(SparkPreset *preset);
     void turn_effect_onoff(char *pedal, bool onoff);
+    void turn_effect_onoff_input(char *pedal, bool onoff, uint8_t input);
     void change_hardware_preset(uint8_t curr_preset, uint8_t preset_num);
     void change_effect(char *pedal1, char *pedal2);
+    void change_effect_input(char *pedal1, char *pedal2, uint8_t input);
     void change_effect_parameter(char *pedal, int param, float val);
+    void change_effect_parameter_input(char *pedal, int param, float val, uint8_t input);   
     void get_serial();
     void get_name();
     void get_hardware_preset_number();

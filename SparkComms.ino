@@ -187,7 +187,7 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 
 void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
 
-#ifdef BLE_DEUMP
+#ifdef BLE_DUMP
   int i;
   byte b;
 
@@ -259,7 +259,7 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     const char *data = s.c_str();
     int index = from_app_index;
 
-#ifdef BLE_DEUMP
+#ifdef BLE_DUMP
     int i = 0;
     byte b;
     DEB("FROM APP:          ");

@@ -1140,6 +1140,20 @@ void MessageOut::change_effect_parameter (char *pedal, int param, float val)
    end_message();
 }
 
+void MessageOut::change_effect_parameter_input (char *pedal, int param, float val, uint8_t input)
+{
+   if (cmd_base == 0x0100) 
+     start_message (cmd_base + 0x04);
+   else
+     start_message (cmd_base + 0x37);
+   write_prefixed_string (pedal);
+   write_byte (byte(param));
+   write_float(val);
+   // Added with LIVE 
+   write_byte(input);  // 0 is Input 1
+   end_message();
+}
+
 void MessageOut::change_effect (char *pedal1, char *pedal2)
 {
    start_message (cmd_base + 0x06);
@@ -1150,7 +1164,15 @@ void MessageOut::change_effect (char *pedal1, char *pedal2)
    end_message();
 }
 
-
+void MessageOut::change_effect_input(char *pedal1, char *pedal2, uint8_t input)
+{
+   start_message (cmd_base + 0x06);
+   write_prefixed_string (pedal1);
+   write_prefixed_string (pedal2);
+   // Added with LIVE 
+   write_byte(input);  // 0 is Input 1
+   end_message();
+}
 
 void MessageOut::change_hardware_preset (uint8_t curr_preset, uint8_t preset_num)
 {
@@ -1168,8 +1190,22 @@ void MessageOut::turn_effect_onoff (char *pedal, bool onoff)
    start_message (cmd_base + 0x15);
    write_prefixed_string (pedal);
    write_onoff (onoff);
+   // Added with LIVE 
+   write_byte(0);  // 0 is Input 1
    end_message();
 }
+
+void MessageOut::turn_effect_onoff_input (char *pedal, bool onoff, uint8_t input)
+{
+   start_message (cmd_base + 0x15);
+   write_prefixed_string (pedal);
+   write_onoff (onoff);
+   // Added with LIVE 
+   write_byte(input);  // 0 is Input 1
+   end_message();
+}
+
+
 
 void MessageOut::get_serial()
 {
