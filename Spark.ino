@@ -88,7 +88,6 @@ bool spark_state_tracker_start() {
       break;      
   }
 
-
   if (spark_type != LIVE) { // should be NOT LIVE but just doing this anyway
     num_inputs = 1;
     num_presets = 4;                 
@@ -99,7 +98,6 @@ bool spark_state_tracker_start() {
     num_presets = 8;          
     max_preset = 7;
   }
-
 
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
   spark_ping_timer = millis();
@@ -143,13 +141,12 @@ bool spark_state_tracker_start() {
       }
       presets[pres][0] = preset;
 
-    //if (got) {
       DEB("Got preset: "); 
       DEBUG(pres);
       dump_preset(presets[pres][0]);
       
       preset_to_get++;
-      if (preset_to_get > max_preset) preset_to_get = 0x0100;
+      if (preset_to_get > max_preset + 0x0000) preset_to_get = 0x0100;
     }
     else {
       DEB("Missed preset: "); 
@@ -174,13 +171,12 @@ bool spark_state_tracker_start() {
       }
       presets[pres][1] = preset;
 
-    //if (got) {
       DEB("Got preset: "); 
       DEBUG(pres);
       dump_preset(presets[pres][1]);
       
       preset_to_get++;
-      if (preset_to_get > max_preset) preset_to_get = 0x0400;
+      if (preset_to_get > max_preset + 0x0300) preset_to_get = 0x0400;
     }
     else {
       DEB("Missed preset: "); 
@@ -218,28 +214,25 @@ bool  update_spark_state() {
 
 
   process_sparkIO();
-//  spark_comms_process();
-//  spark_process();
-//  app_process();
   
   // K&R: Expressions connected by && or || are evaluated left to right, 
   // and it is guaranteed that evaluation will stop as soon as the truth or falsehood is known.
   
-  if (spark_msg_in.get_message(&cmdsub, &msg, &preset) || app_msg_in.get_message(&cmdsub, &msg, & preset)) {
+  if (spark_msg_in.get_message(&cmdsub, &msg, &preset) || app_msg_in.get_message(&cmdsub, &msg, &preset)) {
     DEB("Message: ");
     DEBUG(cmdsub, HEX);
 
     // all the processing for sync
     switch (cmdsub) {
       // full preset details
+
       case 0x0301:  
       case 0x0101:
         pres = (preset.preset_num == 0x7f) ? TMP_PRESET : preset.preset_num;
         if (preset.curr_preset == 0x01 || preset.curr_preset == 0x04)
           pres = CUR_EDITING;
         input = (preset.curr_preset > 2);     // this makes input either 0 for 0x00 and 0x01 or 1 for 0x03 and 0x04
-        presets[pres][input] = preset;          // don't use current input to store
-        //dump_preset(&presets[pres]);
+        
         DEB("Got preset ");
         DEB(input);
         DEB(" : ");
@@ -248,6 +241,9 @@ bool  update_spark_state() {
         DEB(preset.curr_preset);
         DEB(" : ");
         DEBUG(preset.preset_num);
+
+        presets[pres][input] = preset;          // don't use current input to store
+        //dump_preset(presets[pres][input]);
         break;
       // change of amp model
       case 0x0306:
@@ -287,7 +283,7 @@ bool  update_spark_state() {
         setting_modified = false;
         // SparkBox specific
         // Only update the displayed preset number for HW presets
-        if (selected_preset < num_presets){
+        if (selected_preset < num_presets) {
           display_preset_num = selected_preset; 
         }                        
         break;
@@ -301,19 +297,19 @@ bool  update_spark_state() {
         setting_modified = false;
         // SparkBox specific
         // Only update the displayed preset number for HW presets
-        if (selected_preset < num_presets){
+        if (selected_preset < num_presets) {
           display_preset_num = selected_preset; 
         }  
         break;
       // current selected preset
       case 0x0310:
         selected_preset = (msg.param2 == 0x7f) ? TMP_PRESET : msg.param2;
-        if (msg.param1 == 0x01) 
+        if (msg.param1 == 0x01 || msg.param1 == 0x04) 
           selected_preset = CUR_EDITING;
         presets[CUR_EDITING][current_input] = presets[selected_preset][current_input];
         // SparkBox specific
         // Only update the displayed preset number for HW presets
-        if (selected_preset < num_presets){
+        if (selected_preset < num_presets) {
           display_preset_num = selected_preset; 
         }
         break;

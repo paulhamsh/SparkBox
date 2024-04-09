@@ -87,7 +87,7 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // block_from_spark holds the raw data from the Spark amp and data is processed in-place
 // block_from_app holds the raw data from the app and data is processed in-place
 // ------------------------------------------------------------------------------------------------------------
-#define BLOCK_SIZE 1000
+#define BLOCK_SIZE 3000             // Does this ever get checked?
 byte block_from_spark[BLOCK_SIZE];
 byte block_from_app[BLOCK_SIZE];
 
@@ -99,36 +99,36 @@ byte block_from_app[BLOCK_SIZE];
 // ------------------------------------------------------------------------------------------------------------
 
 void dump_raw_block(byte *block, int block_length) {
-  Serial.print("Raw block - length: ");
-  Serial.println(block_length);
+  DEB("Raw block - length: ");
+  DEBUG(block_length);
 
   int lc = 8;
   for (int i = 0; i < block_length; i++) {
     byte b = block[i];
     // 0xf001 chunk header
     if (b == 0xf0) {
-      Serial.println();
+      DEBUG();
       lc = 6;
     }
     // 0x01fe block header
     if (b == 0x01 && block[i+1] == 0xfe) {
       lc = 16;
-      Serial.println();
+      DEBUG();
     }
-    if (b < 16) Serial.print("0");
-    Serial.print(b, HEX);
-    Serial.print(" ");
+    if (b < 16) DEB("0");
+    DEB(b, HEX);
+    DEB(" ");
     if (--lc == 0) {
-      Serial.println();
+      DEBUG();
       lc = 8;
     }
   }
-  Serial.println();
+  DEBUG();
 }
 
 void dump_processed_block(byte *block, int block_length) {
-  Serial.print("Processed block: length - ");
-  Serial.println(block_length);
+  DEB("Processed block: length - ");
+  DEBUG(block_length);
 
   int pos = 0;
   int len = 0;
@@ -139,20 +139,20 @@ void dump_processed_block(byte *block, int block_length) {
     if (len == 0) {
       len = (block[pos+2] << 8) + block[pos+3];
       lc = HEADER_LEN;
-      Serial.println();
+      DEBUG();
     }
     b = block[pos];
-    if (b < 16) Serial.print("0");
-    Serial.print(b, HEX);
-    Serial.print(" ");
+    if (b < 16) DEB("0");
+    DEB(b, HEX);
+    DEB(" ");
     if (--lc == 0) {
-      Serial.println();
+      DEBUG();
       lc = 8;
     }
     len--;
     pos++;
   }
-  Serial.println();
+  DEBUG();
 }
 
 
@@ -366,6 +366,7 @@ void spark_process()
 
   if (got_spark_block) {
     // swiftly make a copy of everything and 'free' the ble block
+
     len = from_spark_index;
     clone(block_from_spark, from_spark, len);
 
@@ -398,6 +399,7 @@ void app_process()
 
   if (got_app_block) {
     // swiftly make a copy of everything and 'free' the ble block
+
     len = from_app_index;
     clone(block_from_app, from_app, len);
 
@@ -568,21 +570,27 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   read_byte(&chksum_errors);
   read_byte(&sequence);
 
-
   bytes_to_uint(len_h, len_l, &len);
   bytes_to_uint(cmd, sub, &cs);
 
   if (chksum_errors > 0) {
     DEBUG("Got a checksum error - need to skip this chunk");
-    for (i = HEADER_LEN; i < len; i++) read_byte(&junk);
+    DEB(cmd, HEX); DEB(" ");
+    DEB(sub, HEX); DEB(" ");
+    DEB(chksum_errors, HEX); DEB(" ");
+    DEB(sequence, HEX); DEB(" ");
+    for (i = HEADER_LEN; i < len; i++) {
+      read_byte(&junk);
+      if (junk < 16) DEB("0");
+      DEB(junk, HEX);
+      DEB(" ");
+    }
+    DEBUG("");
     return false;
   }
 
-
   *cmdsub = cs;
   switch (cs) {
-    case 0x0000:
-      break;
     // 0x02 series - requests
     // get preset information
     case 0x0201:
@@ -620,6 +628,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(msg->str1);
       read_byte(&msg->param1);
       read_float(&msg->val);
+      in_message.clear();        // temporary fix for added Input byte with LIVE
       break;
     // change of effect model
     case 0x0306:
@@ -643,6 +652,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0128:
       read_string(msg->str1);
       read_onoff(&msg->onoff);
+      in_message.clear();        // temporary fix for added Input byte with LIVE
       break;
     // get serial number
     case 0x0323:
@@ -742,6 +752,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0272:
       DEB("Got ");
       DEBUG(cs, HEX);
+      in_message.clear();
       break;
 
     // LIVE messages  
@@ -800,10 +811,6 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB("LIVE hardware preset change 0x031a   ");
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
-      DEB("Fixed array size: ");
-      DEB(num);
-      DEB(" ");
-      // Assume size 2 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
       read_onoff(&msg->bool1);
@@ -913,23 +920,28 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 
 
     default:
-      Serial.print("Unprocessed message ");
-      Serial.print(cs, HEX);
-      Serial.print(" length ");
-      Serial.print(len);
+      DEB("Unprocessed message ");
+      DEB(cs, HEX);
+      DEB(" length ");
+      DEB(len);
 
-      Serial.print(":");
+      DEB(":");
       if (len != 0) {
         for (i = 0; i < len - 6; i++) {
           read_byte(&junk);
-          Serial.print(junk, HEX);
-          Serial.print(" ");
+          DEB(junk, HEX);
+          DEB(" ");
         }
       }
-      Serial.println();
+      DEBUG();
       // defensively clear the message buffer in case this is a bug
       in_message.clear();
   }
+
+  if (!in_message.is_empty()) {
+    DEBUG("SparkIO: Still something in in_message after processing ");
+  }
+
   return true;
 }
 
@@ -1123,6 +1135,8 @@ void MessageOut::change_effect_parameter (char *pedal, int param, float val)
    write_prefixed_string (pedal);
    write_byte (byte(param));
    write_float(val);
+   // Added with LIVE 
+   write_byte(0);  // 0 is Input 1
    end_message();
 }
 
@@ -1131,6 +1145,8 @@ void MessageOut::change_effect (char *pedal1, char *pedal2)
    start_message (cmd_base + 0x06);
    write_prefixed_string (pedal1);
    write_prefixed_string (pedal2);
+   // Added with LIVE 
+   write_byte(0);  // 0 is Input 1
    end_message();
 }
 

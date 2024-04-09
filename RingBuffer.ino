@@ -12,7 +12,7 @@
  * If the temp data is not required it can be ignored using drop() rather than commit()
  * 
  *    +----------------------------------++----------------------------------------------------------------------+
- *    |  0 |  1 |  2 |  3 |  4 |  5 |  6 ||  7 |  8 |  9 | 10 | 11 | 12 | 13 || 14 | 15 | 16 | 17 | 18 | 19 | 20 |                                              |
+ *    |  0 |  1 |  2 |  3 |  4 |  5 |  6 ||  7 |  8 |  9 | 10 | 11 | 12 | 13 || 14 | 15 | 16 | 17 | 18 | 19 | 20 |
  *    +----------------------------------++----------------------------------------------------------------------+  
  *       ^                             ^     ^                             ^
  *       st ---------- len ------------+     +----------- t_len --------- en
@@ -29,14 +29,19 @@ RingBuffer::RingBuffer() {
 
 void RingBuffer::set_from_array(uint8_t *b, int size) {
   int this_len;
+  if (size > RB_BUFF_MAX) DEBUG("Too large for ringbuffer");
+  if (len > 0) DEBUG("Called RingBuffer::set_from_array and ringbuffer not empty");
+
   this_len = (size > RB_BUFF_MAX) ? RB_BUFF_MAX : size;
   memcpy(rb, b, this_len);
+  
   st = 0;
-  en = 0;
+  en = this_len;
   len = this_len;
   t_len = 0;
 }
 
+// copy to an array and clear array
 void RingBuffer::copy_to_array(uint8_t *b, int *size) {
   int i;
   for (i = 0; i < len; i++) {
@@ -68,8 +73,8 @@ bool RingBuffer::get(uint8_t *b) {
     if (st >= RB_BUFF_MAX) st = 0; 
     return true;
   }
-  else
-    return false;  
+  else 
+    return false;    
 }
 
 // set a value at a location in the temp area

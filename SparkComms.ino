@@ -31,14 +31,14 @@ void spark_comms_timer() {
         // mark this as good and wait for the receiver to clear the buffer
         got_spark_block = true;
         last_spark_was_bad = false;
-        DEBUG("Timeout on block, think I got a block");
+        //DEBUG("Timeout on block, think I got a block");
       }
       else {
         got_spark_block = false;
         last_spark_was_bad = true;
         // clear the buffer
         from_spark_index = 0;  
-        DEBUG("Timeout on block, didn't get a block");
+        //DEBUG("Timeout on block, didn't get a block");
       }
     }  
   }
@@ -186,6 +186,29 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 // From the Spark
 
 void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+
+#ifdef BLE_DEUMP
+  int i;
+  byte b;
+
+  DEB("FROM SPARK:        ");
+
+  for (i = 0; i < length; i++) {
+    b = pData[i];
+    if (b < 16) DEB("0");
+    DEB(b, HEX);    
+    DEB(" ");
+    if (i % 20 == 19) { 
+      DEBUG("");
+      DEB("                   ");
+    }
+  }
+  DEBUG();
+#endif
+
+
+  if (got_spark_block) DEBUG("Oh no - spark block not cleared");
+
   // copy to the buffer
   if (from_spark_index + length < BLE_BUFSIZE) {
     memcpy(&from_spark[from_spark_index], pData, length);
@@ -228,11 +251,30 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
 
+    if (got_app_block) DEBUG("Oh no - app block not cleared");
+
     // copy to the buffer 
     std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
     int length = s.size();
     const char *data = s.c_str();
     int index = from_app_index;
+
+#ifdef BLE_DEUMP
+    int i = 0;
+    byte b;
+    DEB("FROM APP:          ");
+    for (i=0; i < length; i++) {
+      b = data[i];
+      if (b < 16) DEB("0");
+      DEB(b, HEX);    
+      DEB(" ");
+      if (i % 20 == 19) { 
+        DEBUG("");
+        DEB("                   ");
+      }   
+    }
+    DEBUG();
+#endif
 
     if (from_app_index + length < BLE_BUFSIZE) {
       memcpy(&from_app[from_app_index], data, length);
