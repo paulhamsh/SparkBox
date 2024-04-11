@@ -418,7 +418,7 @@ void set_input1() {
 void change_generic_model(char *new_eff, int slot) {
   if (strcmp(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff) != 0) {
     set_input1();
-    spark_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff);
+    spark_msg_out.change_effect_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff, current_input);
     strcpy(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_eff);
     spark_send();
     delay(100);
@@ -435,8 +435,8 @@ void change_drive_model(char *new_eff) {
 
 void change_amp_model(char *new_eff) {
   if (strcmp(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff) != 0) {
-    spark_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
-    app_msg_out.change_effect(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
+    spark_msg_out.change_effect_input(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff, current_input);
+    app_msg_out.change_effect_input(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff, current_input);
     strcpy(presets[CUR_EDITING][current_input].effects[3].EffectName, new_eff);
     spark_send();
     app_send();
@@ -456,8 +456,8 @@ void change_delay_model(char *new_eff) {
 
 void change_generic_onoff(int slot,bool onoff) {
   
-  spark_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff);
-  app_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff);
+  spark_msg_out.turn_effect_onoff_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff, current_input);
+  app_msg_out.turn_effect_onoff_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, onoff, current_input);
   presets[CUR_EDITING][current_input].effects[slot].OnOff = onoff;
   spark_send();
   app_send();  
@@ -497,8 +497,8 @@ void change_generic_toggle(int slot) {
 
   new_onoff = !presets[CUR_EDITING][current_input].effects[slot].OnOff;
   
-  spark_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff);
-  app_msg_out.turn_effect_onoff(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff);
+  spark_msg_out.turn_effect_onoff_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff, current_input);
+  app_msg_out.turn_effect_onoff_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, new_onoff, current_input);
   presets[CUR_EDITING][current_input].effects[slot].OnOff = new_onoff;
   spark_send();
   app_send();  
@@ -540,8 +540,8 @@ void change_generic_param(int slot, int param, float val) {
   diff = presets[CUR_EDITING][current_input].effects[slot].Parameters[param] - val;
   if (diff < 0) diff = -diff;
   if (diff > 0.04) {
-    spark_msg_out.change_effect_parameter(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val);
-    app_msg_out.change_effect_parameter(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val);
+    spark_msg_out.change_effect_parameter_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val, current_input);
+    app_msg_out.change_effect_parameter_input(presets[CUR_EDITING][current_input].effects[slot].EffectName, param, val, current_input);
     presets[CUR_EDITING][current_input].effects[slot].Parameters[param] = val;
     spark_send();  
     app_send();

@@ -610,16 +610,15 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     // get serial number - this is a request with no payload
     case 0x0223:
       break;
-    // the UNKNOWN command - 0x0224 00 01 02 03
-    case 0x0224:
-    case 0x022a:
     case 0x032a:
+    // Checksum response (40 / GO / MINI)
       // the data is a fixed array of four bytes (0x94 00 01 02 03)
       read_byte(&junk);
       read_uint(&msg->param1);
       read_uint(&msg->param2);
       read_uint(&msg->param3);
       read_uint(&msg->param4);
+      break;
     // get firmware version - this is a request with no payload
     case 0x022f:
       break;
@@ -628,13 +627,15 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(msg->str1);
       read_byte(&msg->param1);
       read_float(&msg->val);
-      in_message.clear();        // temporary fix for added Input byte with LIVE
+      read_byte(&msg->param2);
+      //in_message.clear();        // temporary fix for added Input byte with LIVE
       break;
     // change of effect model
     case 0x0306:
     case 0x0106:
       read_string(msg->str1);
       read_string(msg->str2);
+      read_byte(&msg->param2);     
       break;
     // get current hardware preset number
     case 0x0310:
@@ -649,11 +650,15 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     // and 0x0128 amp info command
     case 0x0315:
     case 0x0115:
+      read_string(msg->str1);
+      read_onoff(&msg->onoff);
+      read_byte(&msg->param1);
+      //in_message.clear();        // temporary fix for added Input byte with LIVE
+      break;
     case 0x0128:
       read_string(msg->str1);
       read_onoff(&msg->onoff);
-      in_message.clear();        // temporary fix for added Input byte with LIVE
-      break;
+      break;      
     // get serial number
     case 0x0323:
       read_string(msg->str1);
@@ -681,6 +686,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_string(msg->str1);
       read_byte(&msg->param1);
       read_float(&msg->val);
+      read_byte(&msg->param2);   // input - new for LIVE
       break;
     // tuner
     case 0x0364:
@@ -743,19 +749,14 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0415:
     case 0x0438:
     case 0x0465:
-    case 0x0472: 
     case 0x0474: 
     // Serial.print("Got an ack ");
     // Serial.println(cs, HEX);
       break;
-    case 0x0271:
-    case 0x0272:
-      DEB("Got ");
-      DEBUG(cs, HEX);
-      in_message.clear();
-      break;
 
+    //
     // LIVE messages  
+    //
 
     // Power Settings - Auto Standby and Auto Shutdown
     //      boolean       ? (0xc2 = false)
@@ -768,25 +769,73 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param1);
       read_byte(&msg->param2);
       read_byte(&msg->param3);
+
+      DEB("LIVE set power setting ");
+      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEBUG(msg->param3);
+
+      break;
+
+    case 0x0372:
+      read_onoff(&msg->bool1);
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_byte(&msg->param3);
+
+      DEB("LIVE power setting response ");
+      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEBUG(msg->param3);
+
+      break;
+    case 0x0272:
+      DEBUG("LIVE get power setting ");
+      break;
+
+    case 0x0472:
+      read_byte(&junk);
       break;
 
     // Impedance
     //      byte          0x91 - fixed array size 1
-    //      byte          0=IN1, 1=IN2 1/4, 2=IN2 XLR, 3=IN3, 4 = IN4
-    //      byte          0=Standard, 1=Hi-Z, 2=Line, 3=Mic
+    //      byte          0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 3 = IN3, 4 = IN4
+    //      byte          0 = Standard, 1 = Hi-Z, 2 = Line, 3 = Mic
 
     case 0x0174:
       read_byte(&num);
-      read_uint(&msg->param1); // 0=IN1, 1=IN2 1/4, 2=IN2 XLR, 4=IN3/4
-      read_uint(&msg->param2); // 0=Standard, 1=Hi-Z, 2=Line, 3=Mic  
+      read_uint(&msg->param1); // 0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 4 = IN3/4
+      read_uint(&msg->param2); // 0 = Standard, 1 = Hi-Z, 2 = Line, 3 = Mic  
+
+      DEB("LIVE impedance change ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEBUG(msg->param2);
       break;
 
-    // UNKNOWN
-    //      byte          ?
+    //  Get impedance
+    case 0x0274:
+      read_byte(&num);
+      read_uint(&msg->param1); // 0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 4 = IN3/4
 
-    case 0x022b:
-      read_uint(&msg->param1); 
+      DEB("LIVE get impedance ");
+      DEBUG(msg->param1);
       break;
+    
+    // Impedance response
+    case 0x0374:
+      read_byte(&num);
+      read_uint(&msg->param1); // 0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 4 = IN3/4
+      read_uint(&msg->param2); // 0 = Standard, 1 = Hi-Z, 2 = Line, 3 = Mic  
+
+      DEB("LIVE impedance response ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEBUG(msg->param2);
+      break;
+
 
     // Mixer
     //      byte          0 = IN1, 1 = IN2 1/4, 2 = IN2 XLR, 3 = IN3, 4 = IN4, 5= MUSIC, 9 = MASTER
@@ -796,95 +845,178 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_uint(&msg->param1); 
       read_float(&msg->val);
 
-      DEB("MIXER change Channel ");
+      DEB("MIXER change channel ");
       DEB(msg->param1);
       DEB(" Value: ");
       DEBUG(msg->val);
-
       break;
 
-    // NOT PROPOERLY FORMED BELOW HERE 
+    // LIVE INPUT 1 Guitar Volume
+    case 0x036b:
+      read_float(&msg->val);
 
-    // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
-    // Not sure what this represents, but it is an array of: byte byte boolean
-    case 0x031a:
-      DEB("LIVE hardware preset change 0x031a   ");
+      DEB("LIVE guitar volume ");
+      DEBUG(msg->val);
+      break;
+      
+    // LIVE Input 2 Cable Insert  
+    case 0x0373:
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
+      msg->param5 = num;
+
       read_byte(&msg->param1);
       read_byte(&msg->param2);
       read_onoff(&msg->bool1);
-      read_byte(&msg->param3);
-      read_byte(&msg->param4);
-      read_onoff(&msg->bool2);  
 
+      if (num ==2)  {
+        read_byte(&msg->param3);
+        read_byte(&msg->param4);
+        read_onoff(&msg->bool2);
+      }
+
+      DEB("LIVE Input 2 cable insert ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEB(msg->param2);
+      DEB(" ");
+      if (msg->bool1) DEB("plugged in "); else DEB ("unplugged");
+
+      if (num == 2) {
+        DEB(msg->param3);
+        DEB(" ");
+        DEB(msg->param4);
+        DEB(" ");
+        if (msg->bool2) DEB("plugged in "); else DEB ("unplugged"); 
+      }
+      DEBUG("");
+      break;
+
+
+    case 0x0273:
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      msg->param5 = num;
+
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+
+      DEBUG("LIVE get input 2 ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEB(msg->param2);
+      DEBUG(" ");      
+      break;
+
+
+
+    // LIVE request checksums
+    //      byte          Input (0 = Input 1, 1 = Input 2)
+
+    case 0x022b:
+      read_uint(&msg->param1); 
+
+      DEB("Request LIVE checkums, input ");
+      DEBUG(msg->param1);
+      break;
+
+    // Checksum response (LIVE)
+    case 0x032b:
+      // the data is a fixed array of eight bytes (0x98 00 01 02 03)
+      read_byte(&junk);
+      read_uint(&msg->param1);
+      read_uint(&msg->param2);
+      read_uint(&msg->param3);
+      read_uint(&msg->param4);
+      read_uint(&msg->param5);
+      read_uint(&msg->param6);
+      read_uint(&msg->param7);
+      read_uint(&msg->param8);
+
+      DEB("LIVE checksums ");
+      DEB(msg->param1, HEX); DEB(" ");
+      DEB(msg->param2, HEX); DEB(" ");
+      DEB(msg->param3, HEX); DEB(" ");
+      DEB(msg->param4, HEX); DEB(" ");   
+      DEB(msg->param5, HEX); DEB(" ");
+      DEB(msg->param6, HEX); DEB(" ");
+      DEB(msg->param7, HEX); DEB(" ");
+      DEB(msg->param8, HEX); DEBUG(" ");      
+      break;
+
+
+    // LIVE Get mixer setting
+    case 0x0233:
+      read_byte(&msg->param1);
+
+      DEB("LIVE Mixer request setting for input ");
+      DEBUG(msg->param1);
+      break;
+
+
+    // LIVE Mixer
+    case 0x0333:
+      read_float(&msg->val);
+
+      DEB("LIVE Mixer setting is ");
+      DEBUG(msg->val);
+      break;
+
+    // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
+
+    // 0x31a in response to a 0x021a gives:
+    // Unprocessed message 21A length 9:92 0 1 
+    // LIVE hardware preset change 0x031a   0 2 Unchanged 1 6 Unchanged 
+
+    //
+    // But as a hardware generated event (pressed) it gives:
+    // LIVE hardware preset change 0x031a   0 2 Unchanged
+    // Message: 31A 
+
+    case 0x031a:
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array, size 1 or 2
+      msg->param5 = num;
+
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+      read_onoff(&msg->bool1);
+      if (num == 2) {
+        read_byte(&msg->param3);
+        read_byte(&msg->param4);
+        read_onoff(&msg->bool2);  
+      }
+
+      DEB("LIVE hardware preset information response ");      
       DEB(msg->param1);
       DEB(" ");
       DEB(msg->param2);
       if (msg->bool1) DEB(" Unsaved changes "); else DEB(" Unchanged ");
-      DEB(msg->param3);
-      DEB(" "); 
-      DEB(msg->param4);
-      if (msg->bool2) DEB(" Unsaved changes"); else DEB(" Unchanged ");  
+      if (num == 2) {
+        DEB(msg->param3);
+        DEB(" "); 
+        DEB(msg->param4);
+        if (msg->bool2) DEB(" Unsaved changes"); else DEB(" Unchanged ");  
+      }
       DEBUG(""); 
-      in_message.clear();        // clear rest of message as we haven't used it
-      break;
-    // LIVE INPUT 1 Guitar Volume
-    case 0x036b:
-      //DEB("LIVE INPUT 1 Guitar Volume ");
-      read_float(&msg->val);
-      //DEBUG(msg->val);
-      break;
-    // LIVE Mixer
-    case 0x0333:
-      //DEB("LIVE Mixer ");
-      read_float(&msg->val);
-     // DEBUG(msg->val);
-      break;
-    // LIVE INPUT 2 Cable Insert
-    case 0x0374:
-      DEB("LIVE INPUT 2 Cable Insert   ");
-      read_byte(&num);
-      num -= 0x90;  // should be a fixed array
-      DEB("Fixed array size: ");
-      DEB(num);
-      DEB(" ");
-      // Assume size 1 for now
-      read_byte(&msg->param1);
-      read_byte(&msg->param2);
-      DEB(msg->param1);
-      DEB(" ");
-      DEBUG(msg->param1);
-      in_message.clear();   // clear rest of message as we haven't used it
-      break;
-    case 0x0373:
-      DEB("LIVE INPUT 2 Cable Insert");
-      read_byte(&num);
-      num -= 0x90;  // should be a fixed array
-      DEB("Fixed array size: ");
-      DEB(num);
-      DEB(" ");
-      // Assume size 2 for now
-      read_byte(&msg->param1);
-      read_byte(&msg->param2);
-      read_onoff(&msg->bool1);
-      read_byte(&msg->param3);
-      read_byte(&msg->param4);
-      read_onoff(&msg->bool2);   
-      DEB(msg->param1);
-      DEB(" ");
-      DEB(msg->param2);
-      DEB(" ");
-      if (msg->bool1) DEB("On "); else DEB("Off ");
-      DEB(msg->param3);
-      DEB(" ");
-      DEB(msg->param4);
-      DEB(" ");
-      if (msg->bool2) DEBUG("On"); else DEBUG("Off");
-      in_message.clear();   // clear rest of message as we haven't used it
       break;
 
-/*
+    case 0x021a:
+      read_byte(&num);
+      num -= 0x90;  // should be a fixed array
+      msg->param5 = num;
+
+      read_byte(&msg->param1);
+      read_byte(&msg->param2);
+
+      DEB("LIVE get hardware preset information ");      
+      DEB(msg->param1);
+      DEB(" ");
+      DEBUG(msg->param2);
+      break;
+
+
+    /*
     case 0x0371:
       DEBUG("undefined Battery?");
       read_byte(&msg->param1);
@@ -896,28 +1028,16 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEBUG(num, HEX);    // should be 0xCD
       read_byte(&num1);
       read_byte(&num2);
-      bytes_to_uint(num1, num2, &msg->param5);
+      bytes_to_uint(num1, num2, &msg->param10);
       read_byte(&msg->param6);    
       read_byte(&msg->param7);   
-      DEBUG(msg->param5, HEX);   
+      DEBUG(msg->param10, HEX);   
       in_message.clear();
       break;
-*/
+    */
 
-    // unprocessed Spark GO/MINI messages
-
-    case 0x0372:
-    case 0x0304:
-    case 0x0204:
-      in_message.clear();
-      break;
-
-    // unprocessed LIVE Connection Messages
-    case 0x032b:
-      DEBUG("undefined LIVE connection messages");
-      in_message.clear();
-      break;
-
+    // the UNKNOWN command - 0x0224 00 01 02 03
+    //case 0x0224:
 
     default:
       DEB("Unprocessed message ");
@@ -1270,7 +1390,7 @@ void MessageOut::send_ack(unsigned int cmdsub) {
 
 void MessageOut::send_0x022a_info(byte v1, byte v2, byte v3, byte v4)
 {
-   start_message (0x032a);
+   start_message (0x022a);
    write_byte(0x94);
    write_uint(v1);
    write_uint(v2);
