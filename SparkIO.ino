@@ -782,7 +782,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
 
       DEB("LIVE set power setting ");
-      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      if (msg->bool1) DEB("true "); else DEB("false ");
       DEB(msg->param1);
       DEB(" ");
       DEBUG(msg->param3);
@@ -796,7 +796,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
 
       DEB("LIVE power setting response ");
-      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      if (msg->bool1) DEB("true "); else DEB("false ");
       DEB(msg->param1);
       DEB(" ");
       DEBUG(msg->param3);

@@ -149,7 +149,7 @@ bool spark_state_tracker_start() {
 
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][0]);
+      //dump_preset(presets[pres][0]);
       
       preset_to_get++;
       if (preset_to_get > max_preset + 0x0000) preset_to_get = 0x0100;
@@ -179,7 +179,7 @@ bool spark_state_tracker_start() {
 
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][1]);
+      //dump_preset(presets[pres][1]);
       
       preset_to_get++;
       if (preset_to_get > max_preset + 0x0300) preset_to_get = 0x0400;

@@ -207,7 +207,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
 #endif
 
 
-  if (got_spark_block) DEBUG("Oh no - spark block not cleared");
+  //if (got_spark_block) DEBUG("Oh no - spark block not cleared");
 
   // copy to the buffer
   if (from_spark_index + length < BLE_BUFSIZE) {
@@ -251,7 +251,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
 
-    if (got_app_block) DEBUG("Oh no - app block not cleared");
+    //if (got_app_block) DEBUG("Oh no - app block not cleared");
 
     // copy to the buffer 
     std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
