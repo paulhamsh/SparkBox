@@ -124,6 +124,12 @@ bool spark_state_tracker_start() {
   if (got) DEBUG("Got checksum");
   else DEBUG("Failed to get checksum");
 
+  // Get serial number
+  spark_msg_out.get_serial();
+  spark_send();
+  got = wait_for_spark(0x0323);
+  if (got) DEBUG("Got serial number");
+  else DEBUG("Failed to get serial number");
 
   // Get the presets
   preset_to_get = 0x0000;
