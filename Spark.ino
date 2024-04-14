@@ -601,7 +601,9 @@ void change_custom_preset(SparkPreset *preset, int pres_num) {
     presets[pres_num][current_input] = *preset;
     
     spark_msg_out.create_preset(preset);
+    spark_send();  
     spark_msg_out.change_hardware_preset(0, preset->preset_num);
+    spark_send();  
   }
 }
 
