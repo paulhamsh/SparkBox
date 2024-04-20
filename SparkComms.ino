@@ -236,7 +236,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   // but it could also happen to be a standard size and the end of a block
   // in which case we set up a timer to catch it
 
-  if (length != 20 && length != 10 && length != 19 && length != 106) {   // added 19 for Spark LIVE
+  if (from_spark[from_spark_index-1] == 0xf7 && (length != 20 && length != 10 && length != 19 && length != 106)) {   // added 19 for Spark LIVE
     got_spark_block = true;
     spark_timer_active = false;
   }
@@ -251,6 +251,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
 
+
     //if (got_app_block) DEBUG("Oh no - app block not cleared");
 
     // copy to the buffer 
@@ -258,6 +259,9 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     int length = s.size();
     const char *data = s.c_str();
     int index = from_app_index;
+
+  DEB("Got BLE callback size: ");
+  DEBUG(length);
 
 #ifdef BLE_DUMP
     int i = 0;
@@ -300,8 +304,10 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
       #endif
     }
 
-    // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173
-    if (length != 100 && length != 73) {
+    // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173 
+    // Seems Android app has small blocks though
+    if (from_app[from_app_index-1] == 0xf7 && (length != 100 && length != 73 && length != 20  && length != 10 && length != 19 && length != 106)) // added more to cope with Android BLE using smaller packets frrom the app
+    {    
       got_app_block = true;
       app_timer_active = false;
     }
@@ -319,6 +325,11 @@ static CharacteristicCallbacks chrCallbacks_s, chrCallbacks_r;
 // Serial BT callback for data
 void data_callback(const uint8_t *buffer, size_t size) {
   int index = from_app_index;
+
+  DEB("Got SerialBT callback size: ");
+  DEBUG(size);
+
+  if (got_app_block && from_app_index > 0) DEBUG("GOT APP BLOCK TRUE AND FROM_APP_INDEX IS NOT ZERO");
 
   if (from_app_index + size < BLE_BUFSIZE) {
     memcpy(&from_app[from_app_index], buffer, size);
@@ -352,8 +363,9 @@ void data_callback(const uint8_t *buffer, size_t size) {
   }
   */
 
-  // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173
-  if (size != 173) {
+  //if (size != 173) {
+  if (from_app[from_app_index-1] == 0xf7 && (size != 100 && size != 73 && size != 20  && size != 10 && size != 19 && size != 106)) // added more to cope with Android BLE using smaller packets frrom the app  
+  {
     got_app_block = true;
     app_timer_active = false;
   }
@@ -496,6 +508,7 @@ bool connect_to_all() {
   if (!found_sp) return false;   // failed to find the Spark within the number of counts allowed (MAX_SCAN_COUNT)
   connect_spark();
 
+
 #ifdef CLASSIC
   DEBUG("Starting classic bluetooth");
   // now advertise Serial Bluetooth
@@ -504,6 +517,7 @@ bool connect_to_all() {
   len = strlen(spark_ble_name);
   strncpy(spark_bt_name, spark_ble_name, len - 4);   // effectively strip off the ' BLE' at the end
   spark_bt_name[len - 4] = '\0';
+  strcat(spark_bt_name, " Audio");
 
   DEB("Creating classic bluetooth with name ");
   DEBUG(spark_bt_name);

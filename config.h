@@ -15,7 +15,7 @@
 // indicator of when the battery is charging. Maybe.
 //#define BATT_CHECK_1
 //
-// You have the battery monitor mod described above AND you have a connection between the 
+// You have the battery monitor mod described above AND you have a connection between the
 // CHRG pin of the charger chip and GPIO 33. Go you! Now you have a guaranteed charge indicator too.
 //#define BATT_CHECK_2
 //
@@ -26,12 +26,12 @@
 //#define DUMP_ON
 //
 // Uncomment for better Bluetooth compatibility with Android devices
-//#define CLASSIC
+#define CLASSIC
 //
 // Uncomment when using a Heltec module as their implementation doesn't support setMTU()
 //#define HELTEC_WIFI
 //
-// Choose and uncomment the type of OLED display used: 0.96" SSD1306 or 1.3" SH1106 
+// Choose and uncomment the type of OLED display used: 0.96" SSD1306 or 1.3" SH1106
 #define SSD1306
 //#define SH1106
 //
@@ -45,7 +45,7 @@
 #define RETURN_TO_MASTER
 //
 // Logical level of a button being pressed. If your buttons connect to GND, then comment this setting out.
-// This setting also affects Pull-up/down, and waking source settings. 
+// This setting also affects Pull-up/down, and waking source settings.
 //#define ACTIVE_HIGH
 #define ACTIVE_LOW
 //
@@ -60,7 +60,7 @@
 //
 // GPIOs of connected leds
 #ifdef LEDS_USED
-const uint8_t ledPins[]{14,27,26,25};
+const uint8_t ledPins[]{ 14, 27, 26, 25 };
 #endif
 //
 // Are we using the normal or alternate IO for measuring the charging state?
@@ -68,7 +68,7 @@ const uint8_t ledPins[]{14,27,26,25};
 
 // GPIOs of the buttons in your setup in the form of switchPins[]{GPIO_for_button1, GPIO_for_button2, GPIO_for_button3, GPIO_for_button4, ... }
 //const uint8_t switchPins[]{17,5,18,23};                   // Switch gpio numbers (for those who already has built a pedal with these pins)
-const uint8_t switchPins[]{33,14,27,26};                    // PH EDIT
+const uint8_t switchPins[]{ 33, 14, 27, 26 };  // PH EDIT
 //const uint8_t switchPins[]{25,26,27,14};                  // Switch gpio numbers (recommended for those who is building a pedal, these pins allow deep sleep)
 //
 // Startup splash animation
@@ -76,7 +76,7 @@ const uint8_t switchPins[]{33,14,27,26};                    // PH EDIT
 //#define ANIMATION_2
 //
 //
-#define SP_AP_NAME "SparkBox"     // WiFi Access Point (AP) name
-#define SP_AP_IP 192,168,4,1        // IP Address of the web page for setting up WiFi credentials
+#define SP_AP_NAME "SparkBox"    // WiFi Access Point (AP) name
+#define SP_AP_IP 192, 168, 4, 1  // IP Address of the web page for setting up WiFi credentials
 //
 #endif

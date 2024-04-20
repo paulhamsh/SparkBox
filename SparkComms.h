@@ -32,9 +32,10 @@ char spark_bt_name[SIZE_BLE_NAME + 1];
   #endif
 #endif
 
-//#define SPARK_BT_NAME  "Spark 40"
-//#define SPARK_BT_NAME  "Spark MINI"
-//#define SPARK_BT_NAME  "Spark GO"
+//#define SPARK_BT_NAME  "Spark 40 AUdio"
+//#define SPARK_BT_NAME  "Spark MINI Audio"
+//#define SPARK_BT_NAME  "Spark GO Audio"
+//#define SPARK_BT_NAME "Spark LIVE Audio"
 #define DEFAULT_SPARK_BLE_NAME "Spark 40 BLE"
 
 #ifdef CLASSIC

@@ -576,8 +576,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   if (chksum_errors > 0) {
     DEBUG("Got a checksum error - need to skip this chunk");
     DEB(cmd, HEX); DEB(" ");
-    DEB(sub, HEX); DEB(" ");
-    DEB(chksum_errors, HEX); DEB(" ");
+    DEB(sub, HEX); DEB(" : ");
+    DEB(chksum_errors, HEX); DEB(" : ");
     DEB(sequence, HEX); DEB(" ");
     for (i = HEADER_LEN; i < len; i++) {
       read_byte(&junk);
@@ -1055,7 +1055,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB(cs, HEX);
       DEB(" length ");
       DEB(len);
-
+/*
       DEB(":");
       if (len != 0) {
         for (i = 0; i < len - 6; i++) {
@@ -1065,6 +1065,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
         }
       }
       DEBUG();
+*/
       // defensively clear the message buffer in case this is a bug
       in_message.clear();
   }
