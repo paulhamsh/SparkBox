@@ -27,6 +27,7 @@ RingBuffer::RingBuffer() {
   t_len = 0;
 }
 
+/*
 void RingBuffer::set_from_array(uint8_t *b, int size) {
   int this_len;
   if (size > RB_BUFF_MAX) DEBUG("Too large for ringbuffer");
@@ -39,6 +40,19 @@ void RingBuffer::set_from_array(uint8_t *b, int size) {
   en = this_len;
   len = this_len;
   t_len = 0;
+}
+*/
+
+void RingBuffer::set_from_array(uint8_t *b, int size) {
+  int i;
+
+  for (i = 0; i < size; i++)
+    if (len < RB_BUFF_MAX) {
+      rb[en] = b[i];
+      len++;
+      en++; 
+      if (en >= RB_BUFF_MAX) en = 0; 
+    }
 }
 
 // copy to an array and clear array

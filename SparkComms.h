@@ -17,7 +17,7 @@ enum {S40, MINI, GO, LIVE} spark_type = MINI;
 char spark_ble_name[SIZE_BLE_NAME + 1];
 char spark_bt_name[SIZE_BLE_NAME + 1];
 
-//#define BLE_DUMP 
+#define BLE_DUMP 
 
 #define DEBUG_ON
 

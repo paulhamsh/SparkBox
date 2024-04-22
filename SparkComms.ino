@@ -31,14 +31,14 @@ void spark_comms_timer() {
         // mark this as good and wait for the receiver to clear the buffer
         got_spark_block = true;
         last_spark_was_bad = false;
-        //DEBUG("Timeout on block, think I got a block");
+        DEBUG("Timeout on spark block - does end in f7");
       }
       else {
         got_spark_block = false;
         last_spark_was_bad = true;
         // clear the buffer
         from_spark_index = 0;  
-        //DEBUG("Timeout on block, didn't get a block");
+        DEBUG("Timeout on spark block - does NOT end in f7");
       }
     }  
   }
@@ -50,35 +50,18 @@ void spark_comms_timer() {
         // mark this as good and wait for the receiver to clear the buffer
         got_app_block = true;
         last_app_was_bad = false;
+        DEBUG("Timeout on app block - does end in f7");
       }
       else {
         got_app_block = false;
         last_app_was_bad = true;
         // clear the buffer
         from_app_index = 0;  
+        DEBUG("Timeout on app block - does NOT end in f7");
       }
     }  
   }
 }
-
-/*
-void start_timer() {
-  timerRestart(timer_sp);
-  timerAlarmWrite(timer_sp, TIMER, true);
-  timerAlarmEnable(timer_sp);
-  spark_timer_active = false;
-  app_timer_active = false;
-}
-
-void setup_timer_sp() {
-  timer_sp = timerBegin(2, 80, true);                    // timer 2, prescale 80       
-  timerAttachInterrupt(timer_sp, &timer_cb_sp, true);    // count up
-  start_timer();
-  spark_timer_active = false;
-  app_timer_active = false;
-}
-*/
-
 
 void spark_comms_process() {
   int packets_waiting;
@@ -198,7 +181,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
     if (b < 16) DEB("0");
     DEB(b, HEX);    
     DEB(" ");
-    if (i % 20 == 19) { 
+    if (i % 32 == 31) { 
       DEBUG("");
       DEB("                   ");
     }
@@ -239,6 +222,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   if (from_spark[from_spark_index-1] == 0xf7 && (length != 20 && length != 10 && length != 19 && length != 106)) {   // added 19 for Spark LIVE
     got_spark_block = true;
     spark_timer_active = false;
+    DEBUG("Found end of block");
   }
   else {
     last_spark_time = millis();
@@ -272,7 +256,7 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
       if (b < 16) DEB("0");
       DEB(b, HEX);    
       DEB(" ");
-      if (i % 20 == 19) { 
+      if (i % 32 == 31) { 
         DEBUG("");
         DEB("                   ");
       }   
@@ -310,6 +294,7 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     {    
       got_app_block = true;
       app_timer_active = false;
+      DEBUG("Found end of block");
     }
     else {
       last_app_time = millis();
@@ -328,6 +313,24 @@ void data_callback(const uint8_t *buffer, size_t size) {
 
   DEB("Got SerialBT callback size: ");
   DEBUG(size);
+
+#ifdef BLE_DUMP
+    int i = 0;
+    byte b;
+    DEB("FROM APP:          ");
+    for (i=0; i < size; i++) {
+      b = buffer[i];
+      if (b < 16) DEB("0");
+      DEB(b, HEX);    
+      DEB(" ");
+      if (i % 32 == 31) { 
+        DEBUG("");
+        DEB("                   ");
+      }   
+    }
+    DEBUG();
+#endif
+
 
   if (got_app_block && from_app_index > 0) DEBUG("GOT APP BLOCK TRUE AND FROM_APP_INDEX IS NOT ZERO");
 
@@ -368,6 +371,7 @@ void data_callback(const uint8_t *buffer, size_t size) {
   {
     got_app_block = true;
     app_timer_active = false;
+    DEBUG("Found end of block");
   }
   else {
     last_app_time = millis();

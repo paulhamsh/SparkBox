@@ -1054,7 +1054,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB("Unprocessed message ");
       DEB(cs, HEX);
       DEB(" length ");
-      DEB(len);
+      DEBUG(len);
 /*
       DEB(":");
       if (len != 0) {
@@ -1070,10 +1070,11 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       in_message.clear();
   }
 
+  /*
   if (!in_message.is_empty()) {
     DEBUG("SparkIO: Still something in in_message after processing ");
   }
-
+  */
   return true;
 }
 
