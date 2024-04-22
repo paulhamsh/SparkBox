@@ -418,8 +418,14 @@ void connect_spark() {
 }
 
 
-
-
+// RTOS
+void dostuff(void *pvParameter)
+{
+  while (1) {
+    Serial.println(">>>>>>>>>>>>>>>>>>");
+    vTaskDelay(10000 / portTICK_RATE_MS);
+  }
+}
 
 
 bool connect_to_all() {
@@ -570,6 +576,12 @@ bool connect_to_all() {
   // flags for data availability
   got_app_block = false;
   got_spark_block = false;
+
+
+  // RTOS
+  xTaskCreate(&dostuff, "Test task", 2048, NULL, 5, NULL);
+
+
 
   return true;
 }
