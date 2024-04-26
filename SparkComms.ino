@@ -1,96 +1,372 @@
 #include "SparkComms.h"
 
+//#define DEBUG_COMMS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_COMMS(...) {}
 
-//hw_timer_t *timer_sp = NULL;
+#define DEBUG_STATUS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+//#define DEBUG_STATUS(...) {}
 
-bool spark_timer_active = false;
-unsigned long last_spark_time;
+//#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
+#define DUMP_BUFFER(p, s) {}
 
-bool app_timer_active = false;
-unsigned long last_app_time;
+struct packet_data {
+  uint8_t *ptr;
+  int size;
+};
+
+struct packet_data packet_spark, packet_app;
+unsigned long lastAppPacketTime;
+unsigned long lastSparkPacketTime;
+QueueHandle_t qFromApp;
+QueueHandle_t qFromSpark;
+
+// simply copy the packet received and put pointer in the queue
+void app_callback(uint8_t *buf, int size) {
+  struct packet_data qe;
+  qe.ptr = (uint8_t *) malloc(size) ;
+  qe.size = size;
+  memcpy(qe.ptr, buf, size);
+  xQueueSend (qFromApp, &qe, (TickType_t) 0);
+}
 
 
+void spark_callback(uint8_t *buf, int size) {
+  struct packet_data qe;
+  qe.ptr = (uint8_t *) malloc(size) ;
+  qe.size = size;
+  memcpy(qe.ptr, buf, size);
+  xQueueSend (qFromSpark, &qe, (TickType_t) 0);
+}
 
-#define PASSTHRU_TABLE_SIZE 30
-
-int passthru_packet_index = 0;
-int passthru_packet_start[PASSTHRU_TABLE_SIZE];
-int passthru_packet_length[PASSTHRU_TABLE_SIZE];
-
-//SemaphoreHandle_t xFromAppMutex = NULL;  // Create a mutex object
-QueueHandle_t qAppToSpark;
+// read from queue, pass-through to amp then check for a complete valid message to send on for processing
 
 
-// this is to catch a good block that ends on a 10, 20 or 106 byte boundary via a timeout
-//void ARDUINO_ISR_ATTR timer_cb_sp() {
-void spark_comms_timer() {
-  if (spark_timer_active && (millis() - last_spark_time > SPARK_TIMEOUT)) {
-    spark_timer_active = false;
-    if (from_spark_index != 0) {
-      if (from_spark[from_spark_index-1] == 0xf7) {
-        // mark this as good and wait for the receiver to clear the buffer
-        got_spark_block = true;
-        last_spark_was_bad = false;
-        DEBUG("Timeout on spark block - does end in f7");
-      }
-      else {
-        got_spark_block = false;
-        last_spark_was_bad = true;
-        // clear the buffer
-        from_spark_index = 0;  
-        DEBUG("Timeout on spark block - does NOT end in f7");
-      }
-    }  
+void do_comms_init() {
+  packet_spark.size = 0;
+  packet_app.size = 0;
+  lastAppPacketTime = millis();
+  lastSparkPacketTime = millis();
+  qFromApp   = xQueueCreate(20, sizeof (struct packet_data));
+  qFromSpark = xQueueCreate(20, sizeof (struct packet_data));
+}
+
+// for now just integrate into the old code
+void process_app_packet(struct packet_data *pd, int *start, int *end) {
+  int len;
+
+  len = *end - *start + 1;
+  memcpy(&from_app[from_app_index], &pd->ptr[*start], len); 
+  from_app_index += len;
+  got_app_block = true;
+
+  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
+}
+
+void process_spark_packet(struct packet_data *pd, int *start, int *end) {
+  int len;
+
+  len = *end - *start + 1;
+  memcpy(&from_spark[from_spark_index], &pd->ptr[*start], len); 
+  from_spark_index += len;
+  got_spark_block = true;
+
+  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
+}
+
+
+void remove_block_headers (struct packet_data *pd, int *f7_pos) {
+  int p = 0;
+  DUMP_BUFFER(pd->ptr, *f7_pos);
+  //for (int i=0; i<=*f7_pos; i++) {Serial.print(pd->ptr[i], HEX); Serial.print(" ");}; Serial.println();
+  while (p < *f7_pos) {
+    if (pd->ptr[p] == 0x01 && pd->ptr[p + 1] == 0xfe) {
+      for (int i = p; i < pd->size - 16; i++) 
+        pd->ptr[i] = pd->ptr[i + 16];
+      pd->size -= 16;
+      *f7_pos -= 16; 
+      pd->ptr = (uint8_t *) realloc(pd->ptr, pd->size);
+    }
+    else
+      p++;
   }
+  DUMP_BUFFER(pd->ptr, *f7_pos);
+}
 
-  if (app_timer_active && (millis() - last_app_time > APP_TIMEOUT)) {
-    app_timer_active = false;
-    if (from_app_index != 0) {
-      if (from_app[from_app_index-1] == 0xf7) {
-        // mark this as good and wait for the receiver to clear the buffer
-        got_app_block = true;
-        last_app_was_bad = false;
-        DEBUG("Timeout on app block - does end in f7");
+
+void handle_spark_packet() {
+  struct packet_data qe; 
+  int start, end;
+  int f7_pos; 
+  bool good_packet;
+  int good_end;
+
+  // process packets queued
+  while (uxQueueMessagesWaiting(qFromSpark) > 0) {
+    lastSparkPacketTime = millis();
+    xQueueReceive(qFromSpark, &qe, (TickType_t) 0);
+
+    // passthru
+    if (ble_passthru && ble_app_connected) {
+      pCharacteristic_send->setValue(qe.ptr, qe.size);
+      pCharacteristic_send->notify(true);
+    }
+
+    #ifdef CLASSIC
+    if (ble_passthru && bt_app_connected) {
+      bt->write(qe.ptr, qe.size);
+    }
+    #endif
+
+
+    if (packet_spark.size == 0)
+      packet_spark.ptr = (uint8_t *)  malloc(qe.size);
+    else
+      packet_spark.ptr = (uint8_t *)  realloc(packet_spark.ptr, packet_spark.size + qe.size);
+
+    memcpy (&packet_spark.ptr[packet_spark.size], qe.ptr, qe.size);
+    packet_spark.size += qe.size;
+    free(qe.ptr); // this was created in app_callback, no longer needed
+
+    DEBUG_STATUS("pd size %d", packet_spark.size);
+
+    // validate new buffer and try to extract message from it
+    // seek a 'f7' starting at the end
+    f7_pos = -1; // not found an f7
+
+    for (int i = packet_spark.size - 1; (i >= 6) && (f7_pos == -1); i--) 
+      if (packet_spark.ptr[i] == 0xf7) f7_pos = i;
+
+    DEBUG_COMMS("f7 pos %d", f7_pos);
+
+    // if we found an f7 we can seek a useful chunk / multichunk
+    if (f7_pos != -1) {
+      end = f7_pos;
+      start = 0;
+      good_end = 0;
+      remove_block_headers(&packet_spark, &f7_pos);
+      while (start < f7_pos) {
+        if (scan_packet(&packet_spark, &start, &end, f7_pos)) {
+          DEBUG_COMMS("Got a good packet %d %d", start, end);
+          process_spark_packet (&packet_spark, &start, &end);
+          good_end = end;
+        }
+        start = end + 1;
       }
-      else {
-        got_app_block = false;
-        last_app_was_bad = true;
-        // clear the buffer
-        from_app_index = 0;  
-        DEBUG("Timeout on app block - does NOT end in f7");
+
+      if (good_end == packet_spark.size - 1) {
+        // processed the whole block
+        DEBUG_COMMS("Processed a whole packet so freeing it");
+        packet_spark.size = 0;
+        free(packet_spark.ptr);
       }
-    }  
+      else if (good_end != 0) {
+        DEBUG_COMMS("Processed a partial packet so removing processed parts");
+        uint8_t *p = packet_spark.ptr;
+        int new_start = good_end + 1;
+        int new_size = packet_spark.size - new_start;
+        p = (uint8_t *) malloc(new_size);
+
+        for (i = 0; i < new_size; i++)
+          p[i] = packet_spark.ptr[new_start + i];
+
+        free(packet_spark.ptr);
+
+        packet_spark.ptr = p;
+        packet_spark.size = new_size;
+      }
+    }
+  }
+  // check for timeouts and delete the packet, it took too long to get a proper packet
+  if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
+    free(packet_spark.ptr);
+    packet_spark.size = 0; 
   }
 }
 
-void spark_comms_process() {
-  int packets_waiting;
-  int i;
-  int index;
-  int len, pos;
+void handle_app_packet() {
+  struct packet_data qe; 
+  int start, end;
+  int f7_pos; 
+  bool good_packet;
+  int good_end;
 
-  // process the 
-  spark_comms_timer();
-  
-  // do passthru to app
-  // it seems to be important to send all queued packets close together else the app gets disconnected - especially the 170 message
-  while (uxQueueMessagesWaiting(qAppToSpark) > 0) {
-    xQueueReceive(qAppToSpark, &index, (TickType_t) 0);
-    //Serial.print(index);
-    //Serial.println();
-    len = passthru_packet_length[index];
-    if (len != 0) {
-      pos = passthru_packet_start[index];
-      //Serial.print("Sending passthru ");
-      //Serial.print(index);
-      //Serial.print(" : ");
-      //Serial.print(pos);
-      //Serial.print(" : ");
-      //Serial.println(len);
-      pSender_sp->writeValue((uint8_t *) &from_app[pos], len, false);    
-      passthru_packet_length[index] = 0;
+  // process packets queued
+  while (uxQueueMessagesWaiting(qFromApp) > 0) {
+    lastAppPacketTime = millis();
+    xQueueReceive(qFromApp, &qe, (TickType_t) 0);
+
+    if (ble_passthru) {
+      pSender_sp->writeValue(qe.ptr, qe.size, false);
+    }
+
+    if (packet_app.size == 0)
+      packet_app.ptr = (uint8_t *)  malloc(qe.size);
+    else
+      packet_app.ptr = (uint8_t *)  realloc(packet_app.ptr, packet_app.size + qe.size);
+
+    memcpy (&packet_app.ptr[packet_app.size], qe.ptr, qe.size);
+    packet_app.size += qe.size;
+    free(qe.ptr); // this was created in app_callback, no longer needed
+
+    DEBUG_STATUS("pd size %d", packet_app.size);
+
+    // validate new buffer and try to extract message from it
+    // seek a 'f7' starting at the end
+    f7_pos = -1; // not found an f7
+
+    for (int i = packet_app.size - 1; (i >= 6) && (f7_pos == -1); i--) 
+      if (packet_app.ptr[i] == 0xf7) f7_pos = i;
+
+    DEBUG_COMMS("f7 pos %d", f7_pos);
+
+    // if we found an f7 we can seek a useful chunk / multichunk
+    if (f7_pos != -1) {
+      end = f7_pos;
+      start = 0;
+      good_end = 0;
+      remove_block_headers(&packet_app, &f7_pos);
+      while (start < f7_pos) {
+        if (scan_packet(&packet_app, &start, &end, f7_pos)) {
+          DEBUG_COMMS("Got a good packet %d %d", start, end);
+          process_app_packet (&packet_app, &start, &end);
+          good_end = end;
+        }
+        start = end + 1;
+      }
+
+      if (good_end == packet_app.size - 1) {
+        // processed the whole block
+        DEBUG_COMMS("Processed a whole packet so freeing it");
+        packet_app.size = 0;
+        free(packet_app.ptr);
+      }
+      else if (good_end != 0) {
+        DEBUG_COMMS("Processed a partial packet so removing processed parts");
+        uint8_t *p = packet_app.ptr;
+        int new_start = good_end + 1;
+        int new_size = packet_app.size - new_start;
+        p = (uint8_t *) malloc(new_size);
+
+        for (i = 0; i < new_size; i++)
+          p[i] = packet_app.ptr[new_start + i];
+
+        free(packet_app.ptr);
+
+        packet_app.ptr = p;
+        packet_app.size = new_size;
+      }
     }
   }
+  // check for timeouts and delete the packet, it took too long to get a proper packet
+  if ((packet_app.size > 0) && (millis() - lastAppPacketTime > APP_TIMEOUT)) {
+    free(packet_app.ptr);
+    packet_app.size = 0; 
+  }
+}
+
+
+bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
+  int cmd; 
+  int sub;
+  int checksum;
+  int multi_total_chunks, multi_this_chunk, multi_last_chunk;
+  int st = -1;
+  int en = -1;
+  int this_checksum = 0;
+  bool is_good = true;
+  bool is_done = false;
+  bool is_multi = false;
+  bool is_final_multi = false;
+  bool is_first_multi = false;
+  bool found_chunk = false;
+
+  uint8_t *buf = pd->ptr;
+  int len = pd->size;
+  int p = *start;
+
+  while (!is_done) {
+    // check to see if past end of buffer
+    if (p > f7_pos) {
+      is_done = true;
+      is_good = false;
+      en = p;
+    }
+ 
+    // found start of a message - either single or multi-chunk
+    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (f7_pos - p >= 6)) {
+
+      //DEBUG_COMMS("Pos %3d: new header", p);
+      found_chunk = true;
+      checksum = buf[p + 3];
+      cmd      = buf[p + 4];
+      sub      = buf[p + 5];
+      this_checksum = 0;
+
+      if ((cmd == 0x01 || cmd == 0x03) && sub == 0x01)
+        is_multi = true;
+      else
+       is_multi = false;
+    
+      if (is_multi) {
+        multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);
+        multi_this_chunk   = buf[p + 8] | (buf[p + 6] & 0x02? 0x80 : 0x00);
+        is_first_multi = (multi_this_chunk == 0);
+        is_final_multi = (multi_this_chunk + 1 == multi_total_chunks);
+
+        //DEBUG_COMMS("Pos %3d: multi-chunk %d of %d", p, multi_this_chunk, multi_total_chunks);
+        if (!is_first_multi && (multi_this_chunk != multi_last_chunk + 1)) {
+          //DEBUG_COMMS( "Gap in multi chunk numbers");
+          is_good = false;
+        }
+      }
+      // only mark start if first multi chunk or not multi at all
+      if (!is_multi || (is_multi && is_first_multi)) {
+        //DEBUG_COMMS("Mark as start of chunks");
+        st = p;
+        is_good = true;
+      }
+
+      // skip header
+      p += 6;
+    }
+
+    // if we have an f7, check we found a header and if multi, we are at last chunk
+    else if (buf[p] == 0xf7 && found_chunk) {
+      //DEBUG_COMMS( "Pos %3d: got f7", p);
+      //DEBUG_COMMS("Provided checksum: %2x Calculated checksum: %2x", checksum, this_checksum);
+      if (checksum != this_checksum)
+        is_good = false;
+      if (is_multi)
+        multi_last_chunk = multi_this_chunk;
+      if (!is_multi| (is_multi && is_final_multi)) {
+        en = p;
+        is_done = true;
+      }
+      else
+        p++;
+    }
+    // haven't found a block yet so just scanning
+    else if (!found_chunk) {
+      p++;
+    }
+
+    // must be processing a meaningful block so update checksum calc
+    else {
+      this_checksum ^= buf[p];
+      p++;
+    }
+  }
+  
+  *start = st;
+  *end = en;
+  DEBUG_COMMS("Returning start: %3d end: %3d status: %s", st, en, is_good ? "good" : "bad");
+  return is_good;
+}
+
+
+void spark_comms_process() {
+  handle_app_packet();
+  handle_spark_packet();
 }
 
 
@@ -126,6 +402,9 @@ class MyServerCallback : public BLEServerCallbacks {
   void onDisconnect(BLEServer *pserver) {
     ble_app_connected = false;
     DEBUG("App disconnected");
+    #ifdef CLASSIC
+      pAdvertising->start(); 
+    #endif
   }
 };
 
@@ -146,24 +425,6 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 #endif
 
 
-
-
-// Blocks sent to the app are max length 0xad or 173 bytes. This includes the 16 byte block header.
-// Without that header the block is 157 bytes.
-// For Spark 40 BLE they are sent as 100 bytes then 73 bytes.
-// 
-// From the amp, max size is 0x6a or 106 bytes (90 bytes plus 16 byte block header).
-// For the Spark 40 these are sent in chunk of 106 bytes.
-// MINI and GO do not use the block header so just transmit 90 bytes.
-// From the MINI and GO, they are sent in chunks of 20 bytes up to the 90 bytes (so 20 + 20 + 20 + 20 + 10). 
-// 
-//
-// Chunks sent from the amp have max size of 39 bytes, 0x27.
-// This is 6 byte header, 1 byte footer, 4 data chunks of 7 bytes, 4 '8 bit' bytes. So 6 + 1 +32 = 39.
-// Because of the multi-chunk header of 3 bytes, there are 32 - 3 = 29 data bytes (0x19)
-//
-// Example
-// F0 01 04 1F 03 01   20  0E 00 19  00 00 59 24   00 39 44 32 46 32 41 41   00 33 2D 34 45 43 35 2D   00 34 42 44 37 2D 41 33   F7
 
 
 // From the Spark
@@ -189,118 +450,29 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   DEBUG();
 #endif
 
-
-  //if (got_spark_block) DEBUG("Oh no - spark block not cleared");
-
-  // copy to the buffer
-  if (from_spark_index + length < BLE_BUFSIZE) {
-    memcpy(&from_spark[from_spark_index], pData, length);
-    from_spark_index += length; 
-  }
-  else {
-    from_spark_index = 0;
-    last_spark_was_bad = true;
-    DEBUG("Exceeded block size");
-  }
-
-  // passthru
-  if (ble_passthru && ble_app_connected) {
-    pCharacteristic_send->setValue(pData, length);
-    pCharacteristic_send->notify(true);
-  }
-
-  #ifdef CLASSIC
-  if (ble_passthru && bt_app_connected) {
-    bt->write(pData, length);
-  }
-  #endif
-
-  // check to see if this is the end of a block - if not a standard packet size (20, 10, 106) then it definitely is
-  // but it could also happen to be a standard size and the end of a block
-  // in which case we set up a timer to catch it
-
-  if (from_spark[from_spark_index-1] == 0xf7 && (length != 20 && length != 10 && length != 19 && length != 106)) {   // added 19 for Spark LIVE
-    got_spark_block = true;
-    spark_timer_active = false;
-    DEBUG("Found end of block");
-  }
-  else {
-    last_spark_time = millis();
-    spark_timer_active = true;
-  }
+  struct packet_data qe;
+  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.size = length;
+  memcpy(qe.ptr, pData, length);
+  xQueueSend (qFromSpark, &qe, (TickType_t) 0);
 }
 
-// From the app
 
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
 
+    std::string s = pCharacteristic->getValue(); 
+    int size = s.size();
+    const char *buf = s.c_str();
 
-    //if (got_app_block) DEBUG("Oh no - app block not cleared");
+    DEB("Got BLE callback size: ");
+    DEBUG(size);
 
-    // copy to the buffer 
-    std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
-    int length = s.size();
-    const char *data = s.c_str();
-    int index = from_app_index;
-
-  DEB("Got BLE callback size: ");
-  DEBUG(length);
-
-#ifdef BLE_DUMP
-    int i = 0;
-    byte b;
-    DEB("FROM APP:          ");
-    for (i=0; i < length; i++) {
-      b = data[i];
-      if (b < 16) DEB("0");
-      DEB(b, HEX);    
-      DEB(" ");
-      if (i % 32 == 31) { 
-        DEBUG("");
-        DEB("                   ");
-      }   
-    }
-    DEBUG();
-#endif
-
-    if (from_app_index + length < BLE_BUFSIZE) {
-      memcpy(&from_app[from_app_index], data, length);
-      from_app_index += length;
-    }
-    else {
-      from_app_index = 0;
-      last_app_was_bad = true;
-      DEBUG("Exceeded app block size");
-    }
-
-    // passthru
-    if (ble_passthru) {
-      #ifdef CLASSIC 
-        passthru_packet_start[passthru_packet_index] = index;
-        passthru_packet_length[passthru_packet_index] = length;
-        xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
-        passthru_packet_index++;
-        if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
-          passthru_packet_index = 0;
-      #else
-        pSender_sp->writeValue((uint8_t *) s.c_str(), length, false);
-      #endif
-    }
-
-    // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173 
-    // Seems Android app has small blocks though
-    if (from_app[from_app_index-1] == 0xf7 && (length != 100 && length != 73 && length != 20  && length != 10 && length != 19 && length != 106)) // added more to cope with Android BLE using smaller packets frrom the app
-    {    
-      got_app_block = true;
-      app_timer_active = false;
-      DEBUG("Found end of block");
-    }
-    else {
-      last_app_time = millis();
-      app_timer_active = true;
-    }
-
+    struct packet_data qe;
+    qe.ptr = (uint8_t *) malloc(size) ;
+    qe.size = size;
+    memcpy(qe.ptr, buf, size);
+    xQueueSend (qFromApp, &qe, (TickType_t) 0);
   };
 };
 
@@ -331,52 +503,12 @@ void data_callback(const uint8_t *buffer, size_t size) {
     DEBUG();
 #endif
 
+    struct packet_data qe;
+    qe.ptr = (uint8_t *) malloc(size) ;
+    qe.size = size;
+    memcpy(qe.ptr, buffer, size);
+    xQueueSend (qFromApp, &qe, (TickType_t) 0);
 
-  if (got_app_block && from_app_index > 0) DEBUG("GOT APP BLOCK TRUE AND FROM_APP_INDEX IS NOT ZERO");
-
-  if (from_app_index + size < BLE_BUFSIZE) {
-    memcpy(&from_app[from_app_index], buffer, size);
-    //for (int i=0; i < length; i++) {Serial.print(" "); Serial.print(from_app[from_app_index + i], HEX);}
-    //Serial.println();
-    from_app_index += size;
-  }
-  else {
-    from_app_index = 0;
-    last_app_was_bad = true;
-    DEBUG("Exceeded app block size");
-  }
-
-
-  // passthru
-  if (ble_passthru) {
-    passthru_packet_start[passthru_packet_index] = index;
-    passthru_packet_length[passthru_packet_index] = size;
-    xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
-    passthru_packet_index++;
-    if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
-      passthru_packet_index = 0;
-  }
-  
-  /*
-  // passthru
-  if (ble_passthru) {
-    passthru_packet_start[passthru_packet_index] = index;
-    passthru_packet_length[passthru_packet_index] = size;
-    passthru_packet_index++;
-  }
-  */
-
-  //if (size != 173) {
-  if (from_app[from_app_index-1] == 0xf7 && (size != 100 && size != 73 && size != 20  && size != 10 && size != 19 && size != 106)) // added more to cope with Android BLE using smaller packets frrom the app  
-  {
-    got_app_block = true;
-    app_timer_active = false;
-    DEBUG("Found end of block");
-  }
-  else {
-    last_app_time = millis();
-    app_timer_active = true;
-  }
 }
 
 
@@ -418,15 +550,6 @@ void connect_spark() {
 }
 
 
-// RTOS
-void dostuff(void *pvParameter)
-{
-  while (1) {
-    Serial.println(">>>>>>>>>>>>>>>>>>");
-    vTaskDelay(10000 / portTICK_RATE_MS);
-  }
-}
-
 
 bool connect_to_all() {
   int i, j;
@@ -434,8 +557,9 @@ bool connect_to_all() {
   uint8_t b;
   int len;
 
-  //xFromAppMutex = xSemaphoreCreateMutex();
-  qAppToSpark = xQueueCreate(5, sizeof(int));
+
+  // init comms processing
+  do_comms_init();
 
   strcpy(spark_ble_name, DEFAULT_SPARK_BLE_NAME);
   ble_spark_connected = false;
@@ -570,18 +694,9 @@ bool connect_to_all() {
   //pAdvertising->setManufacturerData(manuf_data);
   pAdvertising->start(); 
 
-  // timers for timeout
-  //setup_timer_sp();
-
   // flags for data availability
   got_app_block = false;
   got_spark_block = false;
-
-
-  // RTOS
-  xTaskCreate(&dostuff, "Test task", 2048, NULL, 5, NULL);
-
-
 
   return true;
 }

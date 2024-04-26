@@ -409,9 +409,11 @@ void app_process()
     from_app_index = 0;
 
     //dump_raw_block(block_from_app, len); 
+
     trim_len = remove_headers(block_from_app, block_from_app, len);
     fix_bit_eight(block_from_app, trim_len);
     len = compact(block_from_app, block_from_app, trim_len);
+    
     //dump_processed_block(block_from_app, len);
 
     app_msg_in.set_from_array(block_from_app, len); 
@@ -578,8 +580,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     DEB(cmd, HEX); DEB(" ");
     DEB(sub, HEX); DEB(" : ");
     DEB(chksum_errors, HEX); DEB(" : ");
-    DEB(sequence, HEX); DEB(" ");
-    for (i = HEADER_LEN; i < len; i++) {
+    DEB(sequence, HEX); DEB(" : ");
+    for (i = 0; i < len; i++) {
       read_byte(&junk);
       if (junk < 16) DEB("0");
       DEB(junk, HEX);
