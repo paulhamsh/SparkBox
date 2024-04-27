@@ -3,8 +3,8 @@
 //#define DEBUG_COMMS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
 #define DEBUG_COMMS(...) {}
 
-#define DEBUG_STATUS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
-//#define DEBUG_STATUS(...) {}
+//#define DEBUG_STATUS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_STATUS(...) {}
 
 //#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
 #define DUMP_BUFFER(p, s) {}
@@ -92,6 +92,57 @@ void remove_block_headers (struct packet_data *pd, int *f7_pos) {
   DUMP_BUFFER(pd->ptr, *f7_pos);
 }
 
+// Packet handling routines
+
+void new_packet_from_data(struct packet_data *pd, uint8_t *data, int length) {
+  pd->ptr = (uint8_t *) malloc(length) ;
+  pd->size = length;
+  memcpy(pd->ptr, data, length);
+}
+
+
+void clear_packet(struct packet_data *pd) {
+    free(pd->ptr);
+    pd->size = 0; 
+}
+
+void append_packet(struct packet_data *pd, struct packet_data *add) {
+  if (pd->size == 0)
+    pd->ptr = (uint8_t *)  malloc(add->size);
+  else
+    pd->ptr = (uint8_t *)  realloc(pd->ptr, pd->size + add->size);
+  memcpy (&pd->ptr[pd->size], add->ptr, add->size);
+  pd->size += add->size;
+}
+
+
+void remove_packet_start(struct packet_data *pd, int end) {
+  if (end == pd->size - 1) {
+    // processed the whole block
+    pd->size = 0;
+    free(pd->ptr);
+  }
+  else if (end != 0) {
+    uint8_t *p = pd->ptr;
+    int new_start = end + 1;
+    int new_size = pd->size - new_start;
+    p = (uint8_t *) malloc(new_size);
+
+    for (i = 0; i < new_size; i++)
+      p[i] = pd->ptr[new_start + i];
+    free(pd->ptr);
+    pd->ptr = p;
+    pd->size = new_size;
+  }
+}
+
+int packet_scan_from_end(struct packet_data *pd, uint8_t to_find) {
+  int pos = -1;
+  for (int i = pd->size - 1; (i >= 0) && (pos == -1); i--) 
+    if (pd->ptr[i] == to_find) pos = i;
+  return pos;
+}
+  
 
 void handle_spark_packet() {
   struct packet_data qe; 
@@ -118,23 +169,15 @@ void handle_spark_packet() {
     #endif
 
 
-    if (packet_spark.size == 0)
-      packet_spark.ptr = (uint8_t *)  malloc(qe.size);
-    else
-      packet_spark.ptr = (uint8_t *)  realloc(packet_spark.ptr, packet_spark.size + qe.size);
-
-    memcpy (&packet_spark.ptr[packet_spark.size], qe.ptr, qe.size);
-    packet_spark.size += qe.size;
-    free(qe.ptr); // this was created in app_callback, no longer needed
+    append_packet(&packet_spark, &qe);
+    clear_packet(&qe); // this was created in app_callback, no longer needed
 
     DEBUG_STATUS("pd size %d", packet_spark.size);
 
     // validate new buffer and try to extract message from it
     // seek a 'f7' starting at the end
-    f7_pos = -1; // not found an f7
 
-    for (int i = packet_spark.size - 1; (i >= 6) && (f7_pos == -1); i--) 
-      if (packet_spark.ptr[i] == 0xf7) f7_pos = i;
+    f7_pos = packet_scan_from_end(&packet_spark, 0xf7); 
 
     DEBUG_COMMS("f7 pos %d", f7_pos);
 
@@ -152,34 +195,14 @@ void handle_spark_packet() {
         }
         start = end + 1;
       }
-
-      if (good_end == packet_spark.size - 1) {
-        // processed the whole block
-        DEBUG_COMMS("Processed a whole packet so freeing it");
-        packet_spark.size = 0;
-        free(packet_spark.ptr);
-      }
-      else if (good_end != 0) {
-        DEBUG_COMMS("Processed a partial packet so removing processed parts");
-        uint8_t *p = packet_spark.ptr;
-        int new_start = good_end + 1;
-        int new_size = packet_spark.size - new_start;
-        p = (uint8_t *) malloc(new_size);
-
-        for (i = 0; i < new_size; i++)
-          p[i] = packet_spark.ptr[new_start + i];
-
-        free(packet_spark.ptr);
-
-        packet_spark.ptr = p;
-        packet_spark.size = new_size;
+      if (good_end != 0) {
+        remove_packet_start(&packet_spark, good_end);
       }
     }
   }
   // check for timeouts and delete the packet, it took too long to get a proper packet
   if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
-    free(packet_spark.ptr);
-    packet_spark.size = 0; 
+    clear_packet(&packet_spark);
   }
 }
 
@@ -199,23 +222,15 @@ void handle_app_packet() {
       pSender_sp->writeValue(qe.ptr, qe.size, false);
     }
 
-    if (packet_app.size == 0)
-      packet_app.ptr = (uint8_t *)  malloc(qe.size);
-    else
-      packet_app.ptr = (uint8_t *)  realloc(packet_app.ptr, packet_app.size + qe.size);
-
-    memcpy (&packet_app.ptr[packet_app.size], qe.ptr, qe.size);
-    packet_app.size += qe.size;
-    free(qe.ptr); // this was created in app_callback, no longer needed
+    append_packet(&packet_app, &qe);
+    clear_packet(&qe); // this was created in app_callback, no longer needed
 
     DEBUG_STATUS("pd size %d", packet_app.size);
 
     // validate new buffer and try to extract message from it
     // seek a 'f7' starting at the end
-    f7_pos = -1; // not found an f7
 
-    for (int i = packet_app.size - 1; (i >= 6) && (f7_pos == -1); i--) 
-      if (packet_app.ptr[i] == 0xf7) f7_pos = i;
+    f7_pos = packet_scan_from_end(&packet_app, 0xf7); 
 
     DEBUG_COMMS("f7 pos %d", f7_pos);
 
@@ -233,34 +248,14 @@ void handle_app_packet() {
         }
         start = end + 1;
       }
-
-      if (good_end == packet_app.size - 1) {
-        // processed the whole block
-        DEBUG_COMMS("Processed a whole packet so freeing it");
-        packet_app.size = 0;
-        free(packet_app.ptr);
-      }
-      else if (good_end != 0) {
-        DEBUG_COMMS("Processed a partial packet so removing processed parts");
-        uint8_t *p = packet_app.ptr;
-        int new_start = good_end + 1;
-        int new_size = packet_app.size - new_start;
-        p = (uint8_t *) malloc(new_size);
-
-        for (i = 0; i < new_size; i++)
-          p[i] = packet_app.ptr[new_start + i];
-
-        free(packet_app.ptr);
-
-        packet_app.ptr = p;
-        packet_app.size = new_size;
+      if (good_end != 0) {
+        remove_packet_start(&packet_app, good_end);
       }
     }
   }
   // check for timeouts and delete the packet, it took too long to get a proper packet
   if ((packet_app.size > 0) && (millis() - lastAppPacketTime > APP_TIMEOUT)) {
-    free(packet_app.ptr);
-    packet_app.size = 0; 
+    clear_packet(&packet_app);
   }
 }
 
@@ -451,27 +446,22 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
 #endif
 
   struct packet_data qe;
-  qe.ptr = (uint8_t *) malloc(length) ;
-  qe.size = length;
-  memcpy(qe.ptr, pData, length);
+  new_packet_from_data(&qe, pData, length);
   xQueueSend (qFromSpark, &qe, (TickType_t) 0);
 }
 
 
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
-
     std::string s = pCharacteristic->getValue(); 
     int size = s.size();
     const char *buf = s.c_str();
 
-    DEB("Got BLE callback size: ");
-    DEBUG(size);
+    //DEB("Got BLE callback size: ");
+    //DEBUG(size);
 
     struct packet_data qe;
-    qe.ptr = (uint8_t *) malloc(size) ;
-    qe.size = size;
-    memcpy(qe.ptr, buf, size);
+    new_packet_from_data(&qe, (uint8_t *) buf, size);
     xQueueSend (qFromApp, &qe, (TickType_t) 0);
   };
 };
@@ -481,10 +471,10 @@ static CharacteristicCallbacks chrCallbacks_s, chrCallbacks_r;
 
 // Serial BT callback for data
 void data_callback(const uint8_t *buffer, size_t size) {
-  int index = from_app_index;
+//  int index = from_app_index;
 
-  DEB("Got SerialBT callback size: ");
-  DEBUG(size);
+  //DEB("Got SerialBT callback size: ");
+  //DEBUG(size);
 
 #ifdef BLE_DUMP
     int i = 0;
@@ -504,9 +494,7 @@ void data_callback(const uint8_t *buffer, size_t size) {
 #endif
 
     struct packet_data qe;
-    qe.ptr = (uint8_t *) malloc(size) ;
-    qe.size = size;
-    memcpy(qe.ptr, buffer, size);
+    new_packet_from_data(&qe, (uint8_t *) buffer, size);
     xQueueSend (qFromApp, &qe, (TickType_t) 0);
 
 }
