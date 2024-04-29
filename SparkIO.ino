@@ -68,18 +68,6 @@
  *
  */
 
- 
-// UTILITY FUNCTIONS
-
-void uint_to_bytes(unsigned int i, uint8_t *h, uint8_t *l) {
-  *h = (i & 0xff00) / 256;
-  *l = i & 0xff;
-}
-
-void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
-  *i = (h & 0xff) * 256 + (l & 0xff);
-}
-
 
 // ------------------------------------------------------------------------------------------------------------
 // Shared global variables
@@ -87,14 +75,10 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // block_from_spark holds the raw data from the Spark amp and data is processed in-place
 // block_from_app holds the raw data from the app and data is processed in-place
 // ------------------------------------------------------------------------------------------------------------
-/*
-#define BLOCK_SIZE 3000             // Does this ever get checked?
-byte block_from_spark[BLOCK_SIZE];
-byte block_from_app[BLOCK_SIZE];
-*/
 
 #define HEADER_LEN 6
 #define CHUNK_HEADER_LEN 6
+
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to dump full blocks of data
@@ -157,6 +141,354 @@ void dump_processed_block(byte *block, int block_length) {
   DEBUG();
 }
 
+// ------------------------------------------------------------------------------------------------------------ 
+// UTILITY FUNCTIONS
+// ------------------------------------------------------------------------------------------------------------
+
+void uint_to_bytes(unsigned int i, uint8_t *h, uint8_t *l) {
+  *h = (i & 0xff00) / 256;
+  *l = i & 0xff;
+}
+
+void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
+  *i = (h & 0xff) * 256 + (l & 0xff);
+}
+
+
+
+// ------------------------------------------------------------------------------------------------------------
+// Packet handling routines
+// ------------------------------------------------------------------------------------------------------------
+
+void new_packet_from_data(struct packet_data *pd, uint8_t *data, int length) {
+  pd->ptr = (uint8_t *) malloc(length) ;
+  pd->size = length;
+  memcpy(pd->ptr, data, length);
+}
+
+void clear_packet(struct packet_data *pd) {
+  free(pd->ptr);
+  pd->size = 0; 
+}
+
+void append_packet(struct packet_data *pd, struct packet_data *add) {
+  if (pd->size == 0)
+    pd->ptr = (uint8_t *)  malloc(add->size);
+  else
+    pd->ptr = (uint8_t *)  realloc(pd->ptr, pd->size + add->size);
+  memcpy (&pd->ptr[pd->size], add->ptr, add->size);
+  pd->size += add->size;
+}
+
+void remove_packet_start(struct packet_data *pd, int end) {
+  if (end == pd->size - 1) {
+    // processed the whole block
+    pd->size = 0;
+    free(pd->ptr);
+  }
+  else if (end != 0) {
+    uint8_t *p = pd->ptr;
+    int new_start = end + 1;
+    int new_size = pd->size - new_start;
+    p = (uint8_t *) malloc(new_size);
+
+    for (i = 0; i < new_size; i++)
+      p[i] = pd->ptr[new_start + i];
+    free(pd->ptr);
+    pd->ptr = p;
+    pd->size = new_size;
+  }
+}
+
+int packet_scan_from_end(struct packet_data *pd, uint8_t to_find) {
+  int pos = -1;
+  for (int i = pd->size - 1; (i >= 0) && (pos == -1); i--) 
+    if (pd->ptr[i] == to_find) pos = i;
+  return pos;
+}
+
+
+// ------------------------------------------------------------------------------------------------------------
+// Routines to handle validating packets of data from SparkComms before further processing
+// Uses the RTOS queues to receive the packets
+// ------------------------------------------------------------------------------------------------------------
+
+//#define DEBUG_COMMS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_COMMS(...) {}
+//#define DEBUG_STATUS(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_STATUS(...) {}
+//#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
+#define DUMP_BUFFER(p, s) {}
+
+
+void remove_block_headers (struct packet_data *pd, int *f7_pos) {
+  int p = 0;
+  DUMP_BUFFER(pd->ptr, *f7_pos);
+  //for (int i=0; i<=*f7_pos; i++) {Serial.print(pd->ptr[i], HEX); Serial.print(" ");}; Serial.println();
+  while (p < *f7_pos) {
+    if (pd->ptr[p] == 0x01 && pd->ptr[p + 1] == 0xfe) {
+      for (int i = p; i < pd->size - 16; i++) 
+        pd->ptr[i] = pd->ptr[i + 16];
+      pd->size -= 16;
+      *f7_pos -= 16; 
+      pd->ptr = (uint8_t *) realloc(pd->ptr, pd->size);
+    }
+    else
+      p++;
+  }
+  DUMP_BUFFER(pd->ptr, *f7_pos);
+}
+
+bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
+  int cmd; 
+  int sub;
+  int checksum;
+  int multi_total_chunks, multi_this_chunk, multi_last_chunk;
+  int st = -1;
+  int en = -1;
+  int this_checksum = 0;
+  bool is_good = true;
+  bool is_done = false;
+  bool is_multi = false;
+  bool is_final_multi = false;
+  bool is_first_multi = false;
+  bool found_chunk = false;
+
+  uint8_t *buf = pd->ptr;
+  int len = pd->size;
+  int p = *start;
+
+  while (!is_done) {
+    // check to see if past end of buffer
+    if (p > f7_pos) {
+      is_done = true;
+      is_good = false;
+      en = p;
+    }
+ 
+    // found start of a message - either single or multi-chunk
+    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (f7_pos - p >= 6)) {
+
+      //DEBUG_COMMS("Pos %3d: new header", p);
+      found_chunk = true;
+      checksum = buf[p + 3];
+      cmd      = buf[p + 4];
+      sub      = buf[p + 5];
+      this_checksum = 0;
+
+      if ((cmd == 0x01 || cmd == 0x03) && sub == 0x01)
+        is_multi = true;
+      else
+       is_multi = false;
+    
+      if (is_multi) {
+        multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);
+        multi_this_chunk   = buf[p + 8] | (buf[p + 6] & 0x02? 0x80 : 0x00);
+        is_first_multi = (multi_this_chunk == 0);
+        is_final_multi = (multi_this_chunk + 1 == multi_total_chunks);
+
+        //DEBUG_COMMS("Pos %3d: multi-chunk %d of %d", p, multi_this_chunk, multi_total_chunks);
+        if (!is_first_multi && (multi_this_chunk != multi_last_chunk + 1)) {
+          //DEBUG_COMMS( "Gap in multi chunk numbers");
+          is_good = false;
+        }
+      }
+      // only mark start if first multi chunk or not multi at all
+      if (!is_multi || (is_multi && is_first_multi)) {
+        //DEBUG_COMMS("Mark as start of chunks");
+        st = p;
+        is_good = true;
+      }
+
+      // skip header
+      p += 6;
+    }
+
+    // if we have an f7, check we found a header and if multi, we are at last chunk
+    else if (buf[p] == 0xf7 && found_chunk) {
+      //DEBUG_COMMS( "Pos %3d: got f7", p);
+      //DEBUG_COMMS("Provided checksum: %2x Calculated checksum: %2x", checksum, this_checksum);
+      if (checksum != this_checksum)
+        is_good = false;
+      if (is_multi)
+        multi_last_chunk = multi_this_chunk;
+      if (!is_multi| (is_multi && is_final_multi)) {
+        en = p;
+        is_done = true;
+      }
+      else
+        p++;
+    }
+    // haven't found a block yet so just scanning
+    else if (!found_chunk) {
+      p++;
+    }
+
+    // must be processing a meaningful block so update checksum calc
+    else {
+      this_checksum ^= buf[p];
+      p++;
+    }
+  }
+  
+  *start = st;
+  *end = en;
+  DEBUG_COMMS("Returning start: %3d end: %3d status: %s", st, en, is_good ? "good" : "bad");
+  return is_good;
+}
+
+
+
+void send_app_packet(struct packet_data *pd, int *start, int *end) {
+  int length;
+  struct packet_data qe;
+
+  // create new packet from the validated data
+  length = *end - *start + 1;
+  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.size = length;
+  memcpy(qe.ptr, &pd->ptr[*start], length); 
+  xQueueSend (qFromAppFilter, &qe, (TickType_t) 0);
+
+  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
+}
+
+void send_spark_packet(struct packet_data *pd, int *start, int *end) {
+  int length;
+  struct packet_data qe;
+
+  // create new packet from the validated data
+  length = *end - *start + 1;
+  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.size = length;
+  memcpy(qe.ptr, &pd->ptr[*start], length); 
+  xQueueSend (qFromSparkFilter, &qe, (TickType_t) 0);
+
+  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
+}
+
+void handle_spark_packet() {
+  struct packet_data qe; 
+  int start, end;
+  int f7_pos; 
+  bool good_packet;
+  int good_end;
+
+  // process packets queued
+  while (uxQueueMessagesWaiting(qFromSpark) > 0) {
+    lastSparkPacketTime = millis();
+    xQueueReceive(qFromSpark, &qe, (TickType_t) 0);
+
+    // passthru
+    if (ble_passthru) {
+      send_to_app(qe.ptr, qe.size);
+    }
+
+    append_packet(&packet_spark, &qe);
+    clear_packet(&qe); // this was created in app_callback, no longer needed
+
+    DEBUG_STATUS("pd size %d", packet_spark.size);
+
+    // validate new buffer and try to extract message from it
+    // seek a 'f7' starting at the end
+
+    f7_pos = packet_scan_from_end(&packet_spark, 0xf7); 
+    DEBUG_COMMS("f7 pos %d", f7_pos);
+
+    // if we found an f7 we can seek a useful chunk / multichunk
+    if (f7_pos != -1) {
+      end = f7_pos;
+      start = 0;
+      good_end = 0;
+      remove_block_headers(&packet_spark, &f7_pos);
+      while (start < f7_pos) {
+        if (scan_packet(&packet_spark, &start, &end, f7_pos)) {
+          DEBUG_COMMS("Got a good packet %d %d", start, end);
+          send_spark_packet(&packet_spark, &start, &end);
+          good_end = end;
+        }
+        start = end + 1;
+      }
+      // remove all good packets fromt the start
+      if (good_end != 0) {
+        remove_packet_start(&packet_spark, good_end);
+      }
+    }
+  }
+  // check for timeouts and delete the packet, it took too long to get a proper packet
+  if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
+    clear_packet(&packet_spark);
+  }
+}
+
+void handle_app_packet() {
+  struct packet_data qe; 
+  int start, end;
+  int f7_pos; 
+  bool good_packet;
+  int good_end;
+
+  // process packets queued
+  while (uxQueueMessagesWaiting(qFromApp) > 0) {
+    lastAppPacketTime = millis();
+    xQueueReceive(qFromApp, &qe, (TickType_t) 0);
+
+    if (ble_passthru) {
+      send_to_spark(qe.ptr, qe.size);
+    }
+
+    append_packet(&packet_app, &qe);
+    clear_packet(&qe); // this was created in app_callback, no longer needed
+
+    DEBUG_STATUS("pd size %d", packet_app.size);
+
+    // validate new buffer and try to extract message from it
+    // seek a 'f7' starting at the end
+
+    f7_pos = packet_scan_from_end(&packet_app, 0xf7); 
+    DEBUG_COMMS("f7 pos %d", f7_pos);
+
+    // if we found an f7 we can seek a useful chunk / multichunk
+    if (f7_pos != -1) {
+      end = f7_pos;
+      start = 0;
+      good_end = 0;
+      remove_block_headers(&packet_app, &f7_pos);
+      while (start < f7_pos) {
+        if (scan_packet(&packet_app, &start, &end, f7_pos)) {
+          DEBUG_COMMS("Got a good packet %d %d", start, end);
+          send_app_packet(&packet_app, &start, &end);
+          good_end = end;
+        }
+        start = end + 1;
+      }
+      // remove all good packets fromt the start
+      if (good_end != 0) {
+        remove_packet_start(&packet_app, good_end);
+      }
+    }
+  }
+  // check for timeouts and delete the packet, it took too long to get a proper packet
+  if ((packet_app.size > 0) && (millis() - lastAppPacketTime > APP_TIMEOUT)) {
+    clear_packet(&packet_app);
+  }
+}
+
+
+// simply copy the packet received and put pointer in the queue
+void app_callback(uint8_t *buf, int size) {
+  struct packet_data qe;
+
+  new_packet_from_data(&qe, buf, size);
+  xQueueSend (qFromApp, &qe, (TickType_t) 0);
+}
+
+void spark_callback(uint8_t *buf, int size) {
+  struct packet_data qe;
+
+  new_packet_from_data(&qe, buf, size);
+  xQueueSend (qFromSpark, &qe, (TickType_t) 0);
+}
 
 // ------------------------------------------------------------------------------------------------------------
 // Global variables
@@ -379,7 +711,6 @@ void spark_process()
   }
 }
 
-
 void app_process() 
 {
   int len;
@@ -405,7 +736,9 @@ void app_process()
 }
 
 void process_sparkIO() {
-  spark_comms_process();
+  handle_app_packet();
+  handle_spark_packet();
+
   spark_process();
   app_process();
 }
@@ -424,7 +757,6 @@ void MessageIn::set_from_array(uint8_t *in, int size) {
 void MessageIn::clear() {
   in_message.clear();
 }
-
 
 void MessageIn::read_byte(uint8_t *b)
 {
@@ -1733,6 +2065,7 @@ byte block_out_temp[BLOCK_SIZE];
 void spark_send() {
   int len;
   byte direction;
+  //byte *block_out;
 
   int this_block;
   int num_blocks;
@@ -1742,6 +2075,9 @@ void spark_send() {
   int this_len;
 
   if (spark_msg_out.has_message()) {
+    //len = spark_msg_out.out_message.get_len();    // allocte memory for the whol
+    //block_out = (byte *) malloc(len);
+
     spark_msg_out.copy_message_to_array(block_out, &len);
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
@@ -1768,14 +2104,17 @@ void spark_send() {
           spark_process();
           done = spark_msg_in.check_for_acknowledgement();
         };
-      }                             
+      } 
     }
+
+    //free(block_out);    
   }
 }
 
 void app_send() {
   int len;
   byte direction;
+  //byte *block_out;
 
   int this_block;
   int num_blocks;
@@ -1785,6 +2124,9 @@ void app_send() {
   int this_len;
 
   if (app_msg_out.has_message()) {
+    //len = app_msg_out.out_message.get_len();    // allocte memory for the whol
+    //block_out = (byte *) malloc(len);
+
     app_msg_out.copy_message_to_array(block_out, &len);
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
@@ -1802,5 +2144,6 @@ void app_send() {
       this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
       send_to_app(&block_out[this_block * block_size], this_len);
     }
+    //free(block_out);    
   }
 }

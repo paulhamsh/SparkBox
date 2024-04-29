@@ -44,6 +44,11 @@ QueueHandle_t qFromSpark;
 QueueHandle_t qFromAppFilter;
 QueueHandle_t qFromSparkFilter;
 
+struct packet_data {
+  uint8_t *ptr;
+  int size;
+};
+
 #ifdef CLASSIC
 #include "BluetoothSerial.h"
 #include <BLEDevice.h>
@@ -57,22 +62,6 @@ BluetoothSerial *bt;
 #endif
 
 #define BLE_BUFSIZE 2000
-
-/*
-byte app_to_spark_data[BLE_BUFSIZE];
-int app_to_spark_len = 0;
-
-
-byte from_app[BLE_BUFSIZE];
-int from_app_index = 0;
-bool got_app_block;
-bool last_app_was_bad;
-
-byte from_spark[BLE_BUFSIZE];
-int from_spark_index = 0;
-bool got_spark_block;
-bool last_spark_was_bad;
-*/
 
 bool ble_passthru;
 
