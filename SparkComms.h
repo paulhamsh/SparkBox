@@ -38,6 +38,12 @@ char spark_bt_name[SIZE_BLE_NAME + 1];
 //#define SPARK_BT_NAME "Spark LIVE Audio"
 #define DEFAULT_SPARK_BLE_NAME "Spark 40 BLE"
 
+
+QueueHandle_t qFromApp;
+QueueHandle_t qFromSpark;
+QueueHandle_t qFromAppFilter;
+QueueHandle_t qFromSparkFilter;
+
 #ifdef CLASSIC
 #include "BluetoothSerial.h"
 #include <BLEDevice.h>
@@ -52,6 +58,7 @@ BluetoothSerial *bt;
 
 #define BLE_BUFSIZE 2000
 
+/*
 byte app_to_spark_data[BLE_BUFSIZE];
 int app_to_spark_len = 0;
 
@@ -65,6 +72,7 @@ byte from_spark[BLE_BUFSIZE];
 int from_spark_index = 0;
 bool got_spark_block;
 bool last_spark_was_bad;
+*/
 
 bool ble_passthru;
 

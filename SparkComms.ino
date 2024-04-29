@@ -14,61 +14,66 @@ struct packet_data {
   int size;
 };
 
-struct packet_data packet_spark, packet_app;
+
+struct packet_data packet_spark;
+struct packet_data packet_app;
 unsigned long lastAppPacketTime;
 unsigned long lastSparkPacketTime;
-QueueHandle_t qFromApp;
-QueueHandle_t qFromSpark;
 
 // simply copy the packet received and put pointer in the queue
 void app_callback(uint8_t *buf, int size) {
   struct packet_data qe;
-  qe.ptr = (uint8_t *) malloc(size) ;
-  qe.size = size;
-  memcpy(qe.ptr, buf, size);
+
+  new_packet_from_data(&qe, buf, size);
   xQueueSend (qFromApp, &qe, (TickType_t) 0);
 }
 
 
 void spark_callback(uint8_t *buf, int size) {
   struct packet_data qe;
-  qe.ptr = (uint8_t *) malloc(size) ;
-  qe.size = size;
-  memcpy(qe.ptr, buf, size);
+
+  new_packet_from_data(&qe, buf, size);
   xQueueSend (qFromSpark, &qe, (TickType_t) 0);
 }
 
 // read from queue, pass-through to amp then check for a complete valid message to send on for processing
 
-
-void do_comms_init() {
+void setup_comms() {
   packet_spark.size = 0;
   packet_app.size = 0;
   lastAppPacketTime = millis();
   lastSparkPacketTime = millis();
-  qFromApp   = xQueueCreate(20, sizeof (struct packet_data));
-  qFromSpark = xQueueCreate(20, sizeof (struct packet_data));
+
+  qFromApp         = xQueueCreate(20, sizeof (struct packet_data));
+  qFromSpark       = xQueueCreate(20, sizeof (struct packet_data));
+
+  qFromAppFilter   = xQueueCreate(20, sizeof (struct packet_data));
+  qFromSparkFilter = xQueueCreate(20, sizeof (struct packet_data));
 }
 
-// for now just integrate into the old code
-void process_app_packet(struct packet_data *pd, int *start, int *end) {
-  int len;
 
-  len = *end - *start + 1;
-  memcpy(&from_app[from_app_index], &pd->ptr[*start], len); 
-  from_app_index += len;
-  got_app_block = true;
+void process_app_packet(struct packet_data *pd, int *start, int *end) {
+  int length;
+  struct packet_data qe;
+
+  length = *end - *start + 1;
+  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.size = length;
+  memcpy(qe.ptr, &pd->ptr[*start], length); 
+  xQueueSend (qFromAppFilter, &qe, (TickType_t) 0);
 
   DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
 }
 
 void process_spark_packet(struct packet_data *pd, int *start, int *end) {
-  int len;
+  int length;
+  struct packet_data qe;
 
-  len = *end - *start + 1;
-  memcpy(&from_spark[from_spark_index], &pd->ptr[*start], len); 
-  from_spark_index += len;
-  got_spark_block = true;
+  length = *end - *start + 1;
+  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.size = length;
+  memcpy(qe.ptr, &pd->ptr[*start], length); 
+  xQueueSend (qFromSparkFilter, &qe, (TickType_t) 0);
 
   DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
 }
@@ -420,8 +425,6 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 #endif
 
 
-
-
 // From the Spark
 
 void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
@@ -547,7 +550,7 @@ bool connect_to_all() {
 
 
   // init comms processing
-  do_comms_init();
+  setup_comms();
 
   strcpy(spark_ble_name, DEFAULT_SPARK_BLE_NAME);
   ble_spark_connected = false;
@@ -681,10 +684,6 @@ bool connect_to_all() {
 
   //pAdvertising->setManufacturerData(manuf_data);
   pAdvertising->start(); 
-
-  // flags for data availability
-  got_app_block = false;
-  got_spark_block = false;
 
   return true;
 }

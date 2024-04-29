@@ -87,9 +87,11 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // block_from_spark holds the raw data from the Spark amp and data is processed in-place
 // block_from_app holds the raw data from the app and data is processed in-place
 // ------------------------------------------------------------------------------------------------------------
+/*
 #define BLOCK_SIZE 3000             // Does this ever get checked?
 byte block_from_spark[BLOCK_SIZE];
 byte block_from_app[BLOCK_SIZE];
+*/
 
 #define HEADER_LEN 6
 #define CHUNK_HEADER_LEN 6
@@ -357,31 +359,23 @@ void spark_process()
 {
   int len;
   int trim_len;
+  uint8_t *blk;
+  struct packet_data qe;
 
-  if (last_spark_was_bad) {
-    last_spark_was_bad = false;
-    spark_msg_in.clear(); 
-    DEBUG("Spark sent a bad block");
-  }
+  while (uxQueueMessagesWaiting(qFromSparkFilter) > 0) {
+    xQueueReceive(qFromSparkFilter, &qe, (TickType_t) 0);
 
-  if (got_spark_block) {
-    // swiftly make a copy of everything and 'free' the ble block
-
-    len = from_spark_index;
-    clone(block_from_spark, from_spark, len);
-
-    // these are from SparkComms - should think of a better approach
-    got_spark_block = false;
-    last_spark_was_bad = false;
-    from_spark_index = 0;
+    len = qe.size;
+    blk = qe.ptr;
 
     //dump_raw_block(block_from_spark, len);   
-    trim_len = remove_headers(block_from_spark, block_from_spark, len);
-    fix_bit_eight(block_from_spark, trim_len);
-    len = compact(block_from_spark, block_from_spark, trim_len);
+    trim_len = remove_headers(blk, blk, len);
+    fix_bit_eight(blk, trim_len);
+    len = compact(blk, blk, trim_len);
     //dump_processed_block(block_from_spark, len);
 
-    spark_msg_in.set_from_array(block_from_spark, len); 
+    spark_msg_in.set_from_array(blk, len); 
+    clear_packet(&qe);
   }
 }
 
@@ -390,33 +384,23 @@ void app_process()
 {
   int len;
   int trim_len;
+  uint8_t *blk;
+  struct packet_data qe;
 
-  if (last_app_was_bad) {
-    last_app_was_bad = false;
-    app_msg_in.clear(); 
-    DEBUG("App sent a bad block");
-  }
+  while (uxQueueMessagesWaiting(qFromAppFilter) > 0) {
+    xQueueReceive(qFromAppFilter, &qe, (TickType_t) 0);
 
-  if (got_app_block) {
-    // swiftly make a copy of everything and 'free' the ble block
-
-    len = from_app_index;
-    clone(block_from_app, from_app, len);
-
-    // these are from SparkComms - should think of a better approach
-    got_app_block = false;
-    last_app_was_bad = false;
-    from_app_index = 0;
+    len = qe.size;
+    blk = qe.ptr;
 
     //dump_raw_block(block_from_app, len); 
-
-    trim_len = remove_headers(block_from_app, block_from_app, len);
-    fix_bit_eight(block_from_app, trim_len);
-    len = compact(block_from_app, block_from_app, trim_len);
-    
+    trim_len = remove_headers(blk, blk, len);
+    fix_bit_eight(blk, trim_len);
+    len = compact(blk, blk, trim_len);
     //dump_processed_block(block_from_app, len);
 
-    app_msg_in.set_from_array(block_from_app, len); 
+    app_msg_in.set_from_array(blk, len); 
+    clear_packet(&qe);
   }
 }
 
@@ -1740,6 +1724,8 @@ int add_headers(byte *out_block, byte *in_block, int in_len) {
 // ------------------------------------------------------------------------------------------------------------
 
 // only need one block out as we won't send to app and amp at same time
+
+#define BLOCK_SIZE 1500
 
 byte block_out[BLOCK_SIZE];
 byte block_out_temp[BLOCK_SIZE];
