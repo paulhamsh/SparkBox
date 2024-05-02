@@ -1,22 +1,29 @@
 #ifndef SparkIO_h
 #define SparkIO_h
 
-#include "RingBuffer.h"
 #include "SparkStructures.h"
 #include "SparkComms.h"
 
 uint8_t license_key[64];
 
+#define BLOCK_SIZE 1500
+
 // MESSAGE INPUT CLASS
 class MessageIn
 {
   public:
-    MessageIn() {};
-    void set_from_array(uint8_t *in, int size);
-    void clear();
+    MessageIn() {
+      qList = xQueueCreate(20, sizeof (struct packet_data));
+    };
+
     bool check_for_acknowledgement();
     bool get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *preset);
-    RingBuffer in_message;
+    QueueHandle_t qList;
+    int buf_size;
+    int buf_pos;
+    uint8_t *buffer;
+
+    void set_buffer(struct packet_data *me);
 
     void read_string(char *str);
     void read_prefixed_string(char *str);
@@ -33,11 +40,11 @@ class MessageOut
   public:
     MessageOut(unsigned int base): cmd_base(base) {};
     
-    bool has_message();
-    void copy_message_to_array(byte *blk, int *len);
+
     // creating messages to send
     void start_message(int cmdsub);
     void end_message();
+    //void add(byte b);
     void write_byte(byte b);
     void write_byte_no_chksum(byte b);
     
@@ -75,9 +82,13 @@ class MessageOut
     // trial message
     void tuner_on_off(bool onoff);
 
-    RingBuffer out_message;
+    int buf_size;
+    int buf_pos;
+    uint8_t buffer[BLOCK_SIZE];
+
     int cmd_base;
     int out_msg_chksum;
+
 };
 
 
@@ -91,6 +102,8 @@ void process_sparkIO();
 
 void spark_send();
 void app_send();
+
+void init_sparkIO();
 
 #endif
       

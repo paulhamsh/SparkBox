@@ -8,7 +8,7 @@ unsigned long lastAppPacketTime;
 unsigned long lastSparkPacketTime;
 
 // read from queue, pass-through to amp then check for a complete valid message to send on for processing
-void setup_comms() {
+void setup_comms_queues() {
   packet_spark.size = 0;
   packet_app.size = 0;
 
@@ -200,7 +200,7 @@ bool connect_to_all() {
 
 
   // init comms processing
-  setup_comms();
+  setup_comms_queues();
 
   strcpy(spark_ble_name, DEFAULT_SPARK_BLE_NAME);
   ble_spark_connected = false;

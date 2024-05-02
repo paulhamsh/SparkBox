@@ -155,27 +155,56 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 }
 
 
+#define MEMORY_TRACE 
+
+uint8_t *malloc_check(int size) {
+  uint8_t *p = (uint8_t *) malloc(size);
+  if (p == NULL) {
+    DEBUG("MALLOC FAILED");
+  }
+  return p;
+
+}
+
+uint8_t *realloc_check(uint8_t *ptr, int new_size) {
+  uint8_t *p = (uint8_t *) realloc(ptr, new_size);
+  if (p == NULL) {
+    DEBUG("REALLOC FAILED");
+  }
+  return p; 
+}
+
+
+void free_check(uint8_t *ptr) {
+  free(ptr);
+}
 
 // ------------------------------------------------------------------------------------------------------------
 // Packet handling routines
 // ------------------------------------------------------------------------------------------------------------
 
+
+void new_packet(struct packet_data *pd, int length) {
+  pd->ptr = (uint8_t *) malloc_check(length) ;
+  pd->size = length;
+}
+
 void new_packet_from_data(struct packet_data *pd, uint8_t *data, int length) {
-  pd->ptr = (uint8_t *) malloc(length) ;
+  pd->ptr = (uint8_t *) malloc_check(length) ;
   pd->size = length;
   memcpy(pd->ptr, data, length);
 }
 
 void clear_packet(struct packet_data *pd) {
-  free(pd->ptr);
+  free_check(pd->ptr);
   pd->size = 0; 
 }
 
 void append_packet(struct packet_data *pd, struct packet_data *add) {
   if (pd->size == 0)
-    pd->ptr = (uint8_t *)  malloc(add->size);
+    pd->ptr = (uint8_t *)  malloc_check(add->size);
   else
-    pd->ptr = (uint8_t *)  realloc(pd->ptr, pd->size + add->size);
+    pd->ptr = (uint8_t *)  realloc_check(pd->ptr, pd->size + add->size);
   memcpy (&pd->ptr[pd->size], add->ptr, add->size);
   pd->size += add->size;
 }
@@ -184,17 +213,17 @@ void remove_packet_start(struct packet_data *pd, int end) {
   if (end == pd->size - 1) {
     // processed the whole block
     pd->size = 0;
-    free(pd->ptr);
+    free_check(pd->ptr);
   }
   else if (end != 0) {
     uint8_t *p = pd->ptr;
     int new_start = end + 1;
     int new_size = pd->size - new_start;
-    p = (uint8_t *) malloc(new_size);
+    p = (uint8_t *) malloc_check(new_size);
 
-    for (i = 0; i < new_size; i++)
+    for (int i = 0; i < new_size; i++)
       p[i] = pd->ptr[new_start + i];
-    free(pd->ptr);
+    free_check(pd->ptr);
     pd->ptr = p;
     pd->size = new_size;
   }
@@ -231,7 +260,7 @@ void remove_block_headers (struct packet_data *pd, int *f7_pos) {
         pd->ptr[i] = pd->ptr[i + 16];
       pd->size -= 16;
       *f7_pos -= 16; 
-      pd->ptr = (uint8_t *) realloc(pd->ptr, pd->size);
+      pd->ptr = (uint8_t *) realloc_check(pd->ptr, pd->size);
     }
     else
       p++;
@@ -345,7 +374,7 @@ void send_app_packet(struct packet_data *pd, int *start, int *end) {
 
   // create new packet from the validated data
   length = *end - *start + 1;
-  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.ptr = (uint8_t *) malloc_check(length) ;
   qe.size = length;
   memcpy(qe.ptr, &pd->ptr[*start], length); 
   xQueueSend (qFromAppFilter, &qe, (TickType_t) 0);
@@ -359,7 +388,7 @@ void send_spark_packet(struct packet_data *pd, int *start, int *end) {
 
   // create new packet from the validated data
   length = *end - *start + 1;
-  qe.ptr = (uint8_t *) malloc(length) ;
+  qe.ptr = (uint8_t *) malloc_check(length) ;
   qe.size = length;
   memcpy(qe.ptr, &pd->ptr[*start], length); 
   xQueueSend (qFromSparkFilter, &qe, (TickType_t) 0);
@@ -621,6 +650,7 @@ void fix_bit_eight(byte *in_block, int in_len) {
   }
 }
 
+// TODO - this currently can cope with multiple messages in a sequence, but doesn't need to be able to do that any more!!!!
 
 int compact(byte *out_block, byte *in_block, int in_len) {
   int len = 0;
@@ -692,7 +722,9 @@ void spark_process()
   int len;
   int trim_len;
   uint8_t *blk;
+
   struct packet_data qe;
+  struct packet_data me;
 
   while (uxQueueMessagesWaiting(qFromSparkFilter) > 0) {
     xQueueReceive(qFromSparkFilter, &qe, (TickType_t) 0);
@@ -705,8 +737,14 @@ void spark_process()
     fix_bit_eight(blk, trim_len);
     len = compact(blk, blk, trim_len);
     //dump_processed_block(block_from_spark, len);
+    
+    new_packet_from_data(&me, blk, len);
+    xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
+    //uxQueueMessagesWaiting(spark_msg_in.qList);
+    //xQueueReceive(spark_msg_in.qList, &me, (TickType_t) 0);
+    //clear_packet(&me);
 
-    spark_msg_in.set_from_array(blk, len); 
+    //spark_msg_in.set_from_array(blk, len); 
     clear_packet(&qe);
   }
 }
@@ -717,6 +755,7 @@ void app_process()
   int trim_len;
   uint8_t *blk;
   struct packet_data qe;
+  struct packet_data me;
 
   while (uxQueueMessagesWaiting(qFromAppFilter) > 0) {
     xQueueReceive(qFromAppFilter, &qe, (TickType_t) 0);
@@ -730,18 +769,31 @@ void app_process()
     len = compact(blk, blk, trim_len);
     //dump_processed_block(block_from_app, len);
 
-    app_msg_in.set_from_array(blk, len); 
+    new_packet_from_data(&me, blk, len);
+    xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
+    //uxQueueMessagesWaiting(app_msg_in.qList);
+    //xQueueReceive(app_msg_in.qList, &me, (TickType_t) 0);
+    //clear_packet(&me);
+
+    //app_msg_in.set_from_array(blk, len); 
     clear_packet(&qe);
   }
 }
 
+
 void process_sparkIO() {
+  
   handle_app_packet();
   handle_spark_packet();
 
   spark_process();
   app_process();
 }
+
+
+
+
+
 
 // ------------------------------------------------------------------------------------------------------------
 // MessageIn class
@@ -750,27 +802,33 @@ void process_sparkIO() {
 // Read messages from the in_message ring buffer and copy to a SparkStructure format
 // ------------------------------------------------------------------------------------------------------------
 
-void MessageIn::set_from_array(uint8_t *in, int size) {
-  in_message.set_from_array(in, size);
-}
-
-void MessageIn::clear() {
-  in_message.clear();
+void MessageIn::set_buffer(struct packet_data *me) 
+{
+  buf_size = me->size;
+  buffer = me->ptr;
+  buf_pos = 0;
 }
 
 void MessageIn::read_byte(uint8_t *b)
 {
-  uint8_t a;
-  in_message.get(&a);
-  *b = a;
+  //uint8_t a;
+  //in_message.get(&a);
+  //*b = a;
+
+  if (buf_pos < buf_size)
+    *b = buffer[buf_pos++];
+  else {
+    *b = 0;
+    DEBUG("READ PAST END OF BUFFER");
+  }
 }   
 
 void MessageIn::read_uint(uint8_t *b)
 {
   uint8_t a;
-  in_message.get(&a);
+  read_byte(&a);
   if (a == 0xCC)
-    in_message.get(&a);
+    read_byte(&a);
   *b = a;
 }
    
@@ -879,7 +937,16 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   uint8_t num, num1, num2;
   uint8_t num_effects;
 
-  if (in_message.is_empty()) return false;
+  struct packet_data me;
+
+  if (uxQueueMessagesWaiting(qList) > 0) {
+    xQueueReceive(qList, &me, (TickType_t) 0);
+    set_buffer(&me);
+  } 
+  else
+    return false;
+
+  //if (in_message.is_empty()) return false;
 
   read_byte(&cmd);
   read_byte(&sub);
@@ -1385,7 +1452,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEBUG();
 */
       // defensively clear the message buffer in case this is a bug
-      in_message.clear();
+      //in_message.clear();
   }
 
   /*
@@ -1393,6 +1460,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     DEBUG("SparkIO: Still something in in_message after processing ");
   }
   */
+
+  clear_packet(&me);
   return true;
 }
 
@@ -1409,7 +1478,14 @@ bool MessageIn::check_for_acknowledgement() {
   uint8_t junk;
   int i, j;
 
-  if (in_message.is_empty()) return false;
+  struct packet_data me;
+
+  if (uxQueueMessagesWaiting(qList) > 0) {
+    xQueueReceive(qList, &me, (TickType_t) 0);
+    set_buffer(&me);
+  } 
+  else
+    return false;
 
   read_byte(&cmd);
   read_byte(&sub);
@@ -1421,8 +1497,10 @@ bool MessageIn::check_for_acknowledgement() {
   bytes_to_uint(len_h, len_l, &len);
   bytes_to_uint(cmd, sub, &cs);
 
-  for (i = HEADER_LEN; i < len; i++) read_byte(&junk);
+  //for (i = HEADER_LEN; i < len; i++) read_byte(&junk);
   if (cs == 0x0401 || cs == 0x0501)  return true;
+
+  clear_packet(&me);
   return false;
 };
 
@@ -1434,9 +1512,6 @@ bool MessageIn::check_for_acknowledgement() {
 // ead messages from the SparkStructure format and place into the out_message ring buffer 
 // ------------------------------------------------------------------------------------------------------------
 
-bool MessageOut::has_message() {
-  return !out_message.is_empty();
-}
 
 void MessageOut::start_message(int cmdsub)
 {
@@ -1445,12 +1520,16 @@ void MessageOut::start_message(int cmdsub)
   om_cmd = (cmdsub & 0xff00) >> 8;
   om_sub = cmdsub & 0xff;
 
-  out_message.add(om_cmd);
-  out_message.add(om_sub);
-  out_message.add(0);      // placeholder for length
-  out_message.add(0);      // placeholder for length
-  out_message.add(0);      // placeholder for checksum errors
-  out_message.add(0x60);   // placeholder for sequence number - setting to 0 will not work!
+  buf_size = sizeof(buffer);
+  buf_pos = 0;
+
+  buffer[0] = om_cmd;
+  buffer[1] = om_sub;
+  buffer[2] = 0;      // placeholder for length
+  buffer[3] = 0;      // placeholder for length
+  buffer[4] = 0;      // placeholder for checksum errors
+  buffer[5] = 0x60;   // placeholder for sequence number - setting to 0 will not work!
+  buf_pos = 6;
 
   out_msg_chksum = 0;
 }
@@ -1460,32 +1539,35 @@ void MessageOut::end_message()
   unsigned int len;
   uint8_t len_h, len_l;
   
-  len = out_message.get_len();
+  len = buf_pos;
   uint_to_bytes(len, &len_h, &len_l);
   
-  out_message.set_at_index(2, len_h);   
-  out_message.set_at_index(3, len_l);
-  out_message.commit();
+  buffer[2] = len_h;   
+  buffer[3] = len_l;
 }
 
 void MessageOut::write_byte_no_chksum(byte b)
 {
-  out_message.add(b);
+  if (buf_pos < buf_size) 
+    buffer[buf_pos++] = b;
+  else {
+    DEBUG("WRITE PAST END OF BUFFER");
+  }
 }
 
 void MessageOut::write_byte(byte b)
 {
-  out_message.add(b);
+  write_byte_no_chksum(b);
   out_msg_chksum += int(b);
 }
 
 void MessageOut::write_uint(byte b)
 {
   if (b > 127) {
-    out_message.add(0xCC);
+    write_byte_no_chksum(0xCC);
     out_msg_chksum += int(0xCC);  
   }
-  out_message.add(b);
+  write_byte_no_chksum(b);
   out_msg_chksum += int(b);
 }
 
@@ -1497,15 +1579,13 @@ void MessageOut::write_uint32(uint32_t w)
 
   mask = 0xFF000000;
   
-  out_message.add(0xCE);
+  write_byte_no_chksum(0xCE);
   out_msg_chksum += int(0xCE);  
 
   for (i = 3; i >= 0; i--) {
     b = (w & mask) >> (8*i);
     mask >>= 8;
     write_uint(b);
-//    out_message.add(b);
-//    out_msg_chksum += int(b);
   }
 }
 
@@ -1821,9 +1901,6 @@ void MessageOut::create_preset(SparkPreset *preset)
   end_message();
 }
 
-void MessageOut::copy_message_to_array(byte *blk, int *len) {
-  out_message.copy_to_array(blk, len);
-}
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to process the msgpack format into Spark blocks
@@ -2050,22 +2127,17 @@ int add_headers(byte *out_block, byte *in_block, int in_len) {
   return out_pos;
 }
 
-
 // ------------------------------------------------------------------------------------------------------------
 // Routines to send to the app and the amp
 // ------------------------------------------------------------------------------------------------------------
 
-// only need one block out as we won't send to app and amp at same time
+// only need one temp block out as we won't send to app and amp at same time (not thread safe!)
 
-#define BLOCK_SIZE 1500
-
-byte block_out[BLOCK_SIZE];
 byte block_out_temp[BLOCK_SIZE];
 
 void spark_send() {
   int len;
   byte direction;
-  //byte *block_out;
 
   int this_block;
   int num_blocks;
@@ -2074,11 +2146,13 @@ void spark_send() {
   int last_block_len;
   int this_len;
 
-  if (spark_msg_out.has_message()) {
-    //len = spark_msg_out.out_message.get_len();    // allocte memory for the whol
-    //block_out = (byte *) malloc(len);
+  uint8_t *block_out;
 
-    spark_msg_out.copy_message_to_array(block_out, &len);
+  block_out = spark_msg_out.buffer;
+  len = spark_msg_out.buf_pos;
+
+  //if (spark_msg_out.has_message()) {
+  if (spark_msg_out.buf_pos > 0) {
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
     len = add_headers(block_out, block_out_temp, len);
@@ -2106,15 +2180,12 @@ void spark_send() {
         };
       } 
     }
-
-    //free(block_out);    
   }
 }
 
 void app_send() {
   int len;
   byte direction;
-  //byte *block_out;
 
   int this_block;
   int num_blocks;
@@ -2123,11 +2194,12 @@ void app_send() {
   int last_block_len;
   int this_len;
 
-  if (app_msg_out.has_message()) {
-    //len = app_msg_out.out_message.get_len();    // allocte memory for the whol
-    //block_out = (byte *) malloc(len);
+  uint8_t *block_out;
 
-    app_msg_out.copy_message_to_array(block_out, &len);
+  block_out = app_msg_out.buffer;
+  len = app_msg_out.buf_pos;
+
+  if (app_msg_out.buf_pos > 0) {
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);
     len = add_headers(block_out, block_out_temp, len);
@@ -2144,6 +2216,5 @@ void app_send() {
       this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
       send_to_app(&block_out[this_block * block_size], this_len);
     }
-    //free(block_out);    
   }
 }
