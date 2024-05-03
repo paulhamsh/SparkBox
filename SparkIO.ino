@@ -155,21 +155,39 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 }
 
 
-#define MEMORY_TRACE 
+// ------------------------------------------------------------------------------------------------------------ 
+// MEMORY FUNCTIONS
+// ------------------------------------------------------------------------------------------------------------
+
+
+#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+//#define DEBUG_MEMORY(...) {}
+
+int memrnd(int mem) {
+  int new_mem;
+
+  if (mem <= 20) new_mem = 20;
+  else if (mem <= 100) new_mem = 100;
+  else if (mem <= 800) new_mem = 800;
+  else new_mem = mem;
+  return new_mem;
+}
+
 
 uint8_t *malloc_check(int size) {
-  uint8_t *p = (uint8_t *) malloc(size);
+  uint8_t *p = (uint8_t *) malloc(memrnd(size));
+  DEBUG_MEMORY("Malloc: %p %d %d", p, size, memrnd(size));
   if (p == NULL) {
-    DEBUG("MALLOC FAILED");
+    DEBUG_MEMORY("MALLOC FAILED: %p %d", p, size);
   }
   return p;
-
 }
 
 uint8_t *realloc_check(uint8_t *ptr, int new_size) {
-  uint8_t *p = (uint8_t *) realloc(ptr, new_size);
+  uint8_t *p = (uint8_t *) realloc(ptr, memrnd(new_size));
+  DEBUG_MEMORY("Realloc: %p %p %d %d", p, ptr, new_size, memrnd(new_size));
   if (p == NULL) {
-    DEBUG("REALLOC FAILED");
+    DEBUG_MEMORY("REALLOC FAILED: %p %p %d", p, ptr, new_size);
   }
   return p; 
 }
@@ -260,7 +278,8 @@ void remove_block_headers (struct packet_data *pd, int *f7_pos) {
         pd->ptr[i] = pd->ptr[i + 16];
       pd->size -= 16;
       *f7_pos -= 16; 
-      pd->ptr = (uint8_t *) realloc_check(pd->ptr, pd->size);
+      // do I even need to do this??
+      // pd->ptr = (uint8_t *) realloc_check(pd->ptr, pd->size);
     }
     else
       p++;
