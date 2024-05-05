@@ -20,6 +20,17 @@ void setup_comms_queues() {
 
   qFromAppFilter   = xQueueCreate(20, sizeof (struct packet_data));
   qFromSparkFilter = xQueueCreate(20, sizeof (struct packet_data));
+
+#ifdef PSRAM
+  if (psramInit()) {
+    Serial.print("PSRAM ok: ");
+    Serial.println(ESP.getFreePsram());
+  }  
+  else {
+    Serial.println("PSRAM failure");
+    while (true);
+  }
+#endif
 }
 
 // client callback for connection to Spark

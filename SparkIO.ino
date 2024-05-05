@@ -160,8 +160,8 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // ------------------------------------------------------------------------------------------------------------
 
 
-#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
-//#define DEBUG_MEMORY(...) {}
+//#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_MEMORY(...) {}
 
 int memrnd(int mem) {
   int new_mem;
@@ -175,7 +175,11 @@ int memrnd(int mem) {
 
 
 uint8_t *malloc_check(int size) {
+#ifdef PSRAM
+  uint8_t *p = (uint8_t *) ps_malloc(memrnd(size));
+#else
   uint8_t *p = (uint8_t *) malloc(memrnd(size));
+#endif
   DEBUG_MEMORY("Malloc: %p %d %d", p, size, memrnd(size));
   if (p == NULL) {
     DEBUG_MEMORY("MALLOC FAILED: %p %d", p, size);
@@ -184,7 +188,11 @@ uint8_t *malloc_check(int size) {
 }
 
 uint8_t *realloc_check(uint8_t *ptr, int new_size) {
+#ifdef PSRAM
+  uint8_t *p = (uint8_t *) ps_realloc(ptr, memrnd(new_size));
+#else
   uint8_t *p = (uint8_t *) realloc(ptr, memrnd(new_size));
+#endif
   DEBUG_MEMORY("Realloc: %p %p %d %d", p, ptr, new_size, memrnd(new_size));
   if (p == NULL) {
     DEBUG_MEMORY("REALLOC FAILED: %p %p %d", p, ptr, new_size);
@@ -247,14 +255,6 @@ void remove_packet_start(struct packet_data *pd, int end) {
   }
 }
 
-int packet_scan_from_end(struct packet_data *pd, uint8_t to_find) {
-  int pos = -1;
-  for (int i = pd->size - 1; (i >= 0) && (pos == -1); i--) 
-    if (pd->ptr[i] == to_find) pos = i;
-  return pos;
-}
-
-
 // ------------------------------------------------------------------------------------------------------------
 // Routines to handle validating packets of data from SparkComms before further processing
 // Uses the RTOS queues to receive the packets
@@ -267,27 +267,7 @@ int packet_scan_from_end(struct packet_data *pd, uint8_t to_find) {
 //#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
 #define DUMP_BUFFER(p, s) {}
 
-
-void remove_block_headers (struct packet_data *pd, int *f7_pos) {
-  int p = 0;
-  DUMP_BUFFER(pd->ptr, *f7_pos);
-  //for (int i=0; i<=*f7_pos; i++) {Serial.print(pd->ptr[i], HEX); Serial.print(" ");}; Serial.println();
-  while (p < *f7_pos) {
-    if (pd->ptr[p] == 0x01 && pd->ptr[p + 1] == 0xfe) {
-      for (int i = p; i < pd->size - 16; i++) 
-        pd->ptr[i] = pd->ptr[i + 16];
-      pd->size -= 16;
-      *f7_pos -= 16; 
-      // do I even need to do this??
-      // pd->ptr = (uint8_t *) realloc_check(pd->ptr, pd->size);
-    }
-    else
-      p++;
-  }
-  DUMP_BUFFER(pd->ptr, *f7_pos);
-}
-
-bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
+bool scan_packet (struct packet_data *pd, int *start, int *this_end) {
   int cmd; 
   int sub;
   int checksum;
@@ -305,17 +285,23 @@ bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
   uint8_t *buf = pd->ptr;
   int len = pd->size;
   int p = *start;
+  int end = *this_end;
 
   while (!is_done) {
     // check to see if past end of buffer
-    if (p > f7_pos) {
+    if (p > end ) {
       is_done = true;
       is_good = false;
       en = p;
     }
  
+    // skip a block header if we find one
+    else if (buf[p] == 0x01 && buf[p + 1] == 0xfe) {
+      p += 16;
+    }
+    
     // found start of a message - either single or multi-chunk
-    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (f7_pos - p >= 6)) {
+    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (end - p >= 6)) {
 
       //DEBUG_COMMS("Pos %3d: new header", p);
       found_chunk = true;
@@ -329,8 +315,8 @@ bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
       else
        is_multi = false;
     
-      if (is_multi) {
-        multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);
+      if (is_multi && (end - p >= 9)) {
+        multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);         
         multi_this_chunk   = buf[p + 8] | (buf[p + 6] & 0x02? 0x80 : 0x00);
         is_first_multi = (multi_this_chunk == 0);
         is_final_multi = (multi_this_chunk + 1 == multi_total_chunks);
@@ -380,12 +366,10 @@ bool scan_packet (struct packet_data *pd, int *start, int *end, int f7_pos) {
   }
   
   *start = st;
-  *end = en;
+  *this_end = en;
   DEBUG_COMMS("Returning start: %3d end: %3d status: %s", st, en, is_good ? "good" : "bad");
   return is_good;
 }
-
-
 
 void send_app_packet(struct packet_data *pd, int *start, int *end) {
   int length;
@@ -437,31 +421,25 @@ void handle_spark_packet() {
 
     DEBUG_STATUS("pd size %d", packet_spark.size);
 
-    // validate new buffer and try to extract message from it
-    // seek a 'f7' starting at the end
-
-    f7_pos = packet_scan_from_end(&packet_spark, 0xf7); 
-    DEBUG_COMMS("f7 pos %d", f7_pos);
-
-    // if we found an f7 we can seek a useful chunk / multichunk
-    if (f7_pos != -1) {
-      end = f7_pos;
-      start = 0;
-      good_end = 0;
-      remove_block_headers(&packet_spark, &f7_pos);
-      while (start < f7_pos) {
-        if (scan_packet(&packet_spark, &start, &end, f7_pos)) {
-          DEBUG_COMMS("Got a good packet %d %d", start, end);
-          send_spark_packet(&packet_spark, &start, &end);
-          good_end = end;
-        }
-        start = end + 1;
+    end = packet_spark.size - 1;
+    f7_pos = end;
+    start = 0;
+    good_end = 0;
+      //remove_block_headers(&packet_spark, &f7_pos);
+      //while (start < f7_pos) {
+    while (start < end) {  
+      if (scan_packet(&packet_spark, &start, &end)) {
+        DEBUG_COMMS("Got a good packet %d %d", start, end);
+        send_spark_packet(&packet_spark, &start, &end);
+        good_end = end;
       }
-      // remove all good packets fromt the start
-      if (good_end != 0) {
-        remove_packet_start(&packet_spark, good_end);
-      }
+      start = end + 1;
     }
+    // remove all good packets fromt the start
+    if (good_end != 0) {
+      remove_packet_start(&packet_spark, good_end);
+    }
+
   }
   // check for timeouts and delete the packet, it took too long to get a proper packet
   if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
@@ -490,30 +468,21 @@ void handle_app_packet() {
 
     DEBUG_STATUS("pd size %d", packet_app.size);
 
-    // validate new buffer and try to extract message from it
-    // seek a 'f7' starting at the end
-
-    f7_pos = packet_scan_from_end(&packet_app, 0xf7); 
-    DEBUG_COMMS("f7 pos %d", f7_pos);
-
-    // if we found an f7 we can seek a useful chunk / multichunk
-    if (f7_pos != -1) {
-      end = f7_pos;
-      start = 0;
-      good_end = 0;
-      remove_block_headers(&packet_app, &f7_pos);
-      while (start < f7_pos) {
-        if (scan_packet(&packet_app, &start, &end, f7_pos)) {
-          DEBUG_COMMS("Got a good packet %d %d", start, end);
-          send_app_packet(&packet_app, &start, &end);
-          good_end = end;
-        }
-        start = end + 1;
+    end = packet_app.size - 1;
+    start = 0;
+    good_end = 0;
+    //remove_block_headers(&packet_app, &f7_pos);
+    while (start < end) {
+      if (scan_packet(&packet_app, &start, &end)) {
+        DEBUG_COMMS("Got a good packet %d %d", start, end);
+        send_app_packet(&packet_app, &start, &end);
+        good_end = end;
       }
-      // remove all good packets fromt the start
-      if (good_end != 0) {
-        remove_packet_start(&packet_app, good_end);
-      }
+      start = end + 1;
+    }
+    // remove all good packets fromt the start
+    if (good_end != 0) {
+      remove_packet_start(&packet_app, good_end);
     }
   }
   // check for timeouts and delete the packet, it took too long to get a proper packet

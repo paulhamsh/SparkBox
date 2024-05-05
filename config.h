@@ -27,6 +27,7 @@
 //
 // Uncomment for better Bluetooth compatibility with Android devices
 #define CLASSIC
+//#define PSRAM
 //
 // Uncomment when using a Heltec module as their implementation doesn't support setMTU()
 //#define HELTEC_WIFI

@@ -71,6 +71,11 @@ bool spark_state_tracker_start() {
   // try to find and connect to Spark - returns false if failed to find Spark
   if (!connect_to_all()) return false;
 
+  #ifdef CLASSIC
+  DEBUG("Bluetooth library is classic Bluedroid");
+  #else
+  DEBUG("Bluetooth library is NimBLE");
+  #endif
   // handle different spark types
   DEB("SPARK TYPE ");
   switch (spark_type) {
