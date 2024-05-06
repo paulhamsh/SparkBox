@@ -160,8 +160,16 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // ------------------------------------------------------------------------------------------------------------
 
 
-//#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
-#define DEBUG_MEMORY(...) {}
+#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+#define DEBUG_HEAP(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+//#define DEBUG_MEMORY(...) {}
+
+void show_heap() {
+  DEBUG_HEAP("Total heap: %d", ESP.getHeapSize());
+  DEBUG_HEAP("Free heap: %d", ESP.getFreeHeap());
+  DEBUG_HEAP("Total PSRAM: %d", ESP.getPsramSize());
+  DEBUG_HEAP("Free PSRAM: %d", ESP.getFreePsram());
+}
 
 int memrnd(int mem) {
   int new_mem;
@@ -184,6 +192,7 @@ uint8_t *malloc_check(int size) {
   if (p == NULL) {
     DEBUG_MEMORY("MALLOC FAILED: %p %d", p, size);
   }
+  show_heap();    
   return p;
 }
 
@@ -197,12 +206,15 @@ uint8_t *realloc_check(uint8_t *ptr, int new_size) {
   if (p == NULL) {
     DEBUG_MEMORY("REALLOC FAILED: %p %p %d", p, ptr, new_size);
   }
+  show_heap();    
   return p; 
 }
 
 
 void free_check(uint8_t *ptr) {
+  DEBUG_MEMORY("Free: %p", ptr);
   free(ptr);
+  show_heap();     
 }
 
 // ------------------------------------------------------------------------------------------------------------

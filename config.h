@@ -27,7 +27,7 @@
 //
 // Uncomment for better Bluetooth compatibility with Android devices
 #define CLASSIC
-//#define PSRAM
+#define PSRAM
 //
 // Uncomment when using a Heltec module as their implementation doesn't support setMTU()
 //#define HELTEC_WIFI
@@ -69,7 +69,8 @@ const uint8_t ledPins[]{ 14, 27, 26, 25 };
 
 // GPIOs of the buttons in your setup in the form of switchPins[]{GPIO_for_button1, GPIO_for_button2, GPIO_for_button3, GPIO_for_button4, ... }
 //const uint8_t switchPins[]{17,5,18,23};                   // Switch gpio numbers (for those who already has built a pedal with these pins)
-const uint8_t switchPins[]{ 33, 14, 27, 26 };  // PH EDIT
+//const uint8_t switchPins[]{ 33, 14, 27, 26 };  // PH EDIT
+const uint8_t switchPins[]{ 33, 14, 27, 26 };  // PH WROVER
 //const uint8_t switchPins[]{25,26,27,14};                  // Switch gpio numbers (recommended for those who is building a pedal, these pins allow deep sleep)
 //
 // Startup splash animation

@@ -45,7 +45,6 @@ extern String bankConfigFile;
 //
 #include "FS.h"
 #include "LittleFS.h"
-#include "BluetoothSerial.h"
 #define ARDUINOJSON_USE_DOUBLE 1
 #include "ArduinoJson.h"            // Should be installed already https://github.com/bblanchon/ArduinoJson
 #include "driver/rtc_io.h"
@@ -163,16 +162,19 @@ void setup() {
   setup_leds();
   #endif
   
+  //// CHANGED THESES FOR WROVER - PH
+  //// WROVER - REMOVED THIS CODE USING 21 and 1
+
   // Debug - On my Heltec module, leaving this unconnected pin hanging causes
   // a display issue where the screen dims, returning if touched.
   pinMode(21,OUTPUT);
   
   // Manually toggle the /RST pin to add Heltec module functionality
   // but without the Heltec library
-  pinMode(16,OUTPUT);
-  digitalWrite(16, LOW);
-  delay(50);
-  digitalWrite(16, HIGH);
+  //pinMode(16,OUTPUT);
+  //digitalWrite(16, LOW);
+  //delay(50);
+  //digitalWrite(16, HIGH);
 
   // Initialize device OLED display, and flip screen, as OLED library starts upside-down
   ui.setTargetFPS(35);
