@@ -160,9 +160,10 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // ------------------------------------------------------------------------------------------------------------
 
 
-#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+//#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
 #define DEBUG_HEAP(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
-//#define DEBUG_MEMORY(...) {}
+#define DEBUG_MEMORY(...) {}
+//#define DEBUG_HEAP(...) {}
 
 void show_heap() {
   DEBUG_HEAP("Total heap: %d", ESP.getHeapSize());
@@ -192,7 +193,7 @@ uint8_t *malloc_check(int size) {
   if (p == NULL) {
     DEBUG_MEMORY("MALLOC FAILED: %p %d", p, size);
   }
-  show_heap();    
+  //show_heap();    
   return p;
 }
 
@@ -206,7 +207,7 @@ uint8_t *realloc_check(uint8_t *ptr, int new_size) {
   if (p == NULL) {
     DEBUG_MEMORY("REALLOC FAILED: %p %p %d", p, ptr, new_size);
   }
-  show_heap();    
+  //show_heap();    
   return p; 
 }
 
@@ -214,7 +215,7 @@ uint8_t *realloc_check(uint8_t *ptr, int new_size) {
 void free_check(uint8_t *ptr) {
   DEBUG_MEMORY("Free: %p", ptr);
   free(ptr);
-  show_heap();     
+  //show_heap();     
 }
 
 // ------------------------------------------------------------------------------------------------------------
@@ -230,7 +231,9 @@ void new_packet(struct packet_data *pd, int length) {
 void new_packet_from_data(struct packet_data *pd, uint8_t *data, int length) {
   pd->ptr = (uint8_t *) malloc_check(length) ;
   pd->size = length;
-  memcpy(pd->ptr, data, length);
+  for (int i = 0; i < length; i++)
+    pd->ptr[i] = data[i];
+  //memcpy(pd->ptr, data, length);
 }
 
 void clear_packet(struct packet_data *pd) {
@@ -376,47 +379,22 @@ bool scan_packet (struct packet_data *pd, int *start, int *this_end) {
       p++;
     }
   }
-  
   *start = st;
   *this_end = en;
   DEBUG_COMMS("Returning start: %3d end: %3d status: %s", st, en, is_good ? "good" : "bad");
   return is_good;
 }
 
-void send_app_packet(struct packet_data *pd, int *start, int *end) {
-  int length;
-  struct packet_data qe;
-
-  // create new packet from the validated data
-  length = *end - *start + 1;
-  qe.ptr = (uint8_t *) malloc_check(length) ;
-  qe.size = length;
-  memcpy(qe.ptr, &pd->ptr[*start], length); 
-  xQueueSend (qFromAppFilter, &qe, (TickType_t) 0);
-
-  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
-}
-
-void send_spark_packet(struct packet_data *pd, int *start, int *end) {
-  int length;
-  struct packet_data qe;
-
-  // create new packet from the validated data
-  length = *end - *start + 1;
-  qe.ptr = (uint8_t *) malloc_check(length) ;
-  qe.size = length;
-  memcpy(qe.ptr, &pd->ptr[*start], length); 
-  xQueueSend (qFromSparkFilter, &qe, (TickType_t) 0);
-
-  DEBUG_COMMS("Processing a packet %d to %d", *start, *end);
-}
-
 void handle_spark_packet() {
   struct packet_data qe; 
+  struct packet_data me;
+  
   int start, end;
-  int f7_pos; 
   bool good_packet;
   int good_end;
+
+  int len, trim_len;
+  uint8_t *blk;
 
   // process packets queued
   while (uxQueueMessagesWaiting(qFromSpark) > 0) {
@@ -434,24 +412,38 @@ void handle_spark_packet() {
     DEBUG_STATUS("pd size %d", packet_spark.size);
 
     end = packet_spark.size - 1;
-    f7_pos = end;
+
     start = 0;
     good_end = 0;
-      //remove_block_headers(&packet_spark, &f7_pos);
-      //while (start < f7_pos) {
-    while (start < end) {  
+
+    while (start < packet_spark.size) {  
       if (scan_packet(&packet_spark, &start, &end)) {
         DEBUG_COMMS("Got a good packet %d %d", start, end);
-        send_spark_packet(&packet_spark, &start, &end);
+
+        len = end - start + 1;
+        blk = &packet_spark.ptr[start];
+
+        // process the packet to extract the msgpack data
+        trim_len = remove_headers(blk, blk, len);
+        fix_bit_eight(blk, trim_len);
+        len = compact(blk, blk, trim_len);
+    
+        // send on for processing
+        new_packet_from_data(&me, blk, len);
+        xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
+
         good_end = end;
       }
       start = end + 1;
     }
+    DEB("Scan spark");
+    DEB(start);
+    DEB(" ");
+    DEBUG(packet_spark.size);
     // remove all good packets fromt the start
     if (good_end != 0) {
       remove_packet_start(&packet_spark, good_end);
     }
-
   }
   // check for timeouts and delete the packet, it took too long to get a proper packet
   if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
@@ -461,10 +453,13 @@ void handle_spark_packet() {
 
 void handle_app_packet() {
   struct packet_data qe; 
+  struct packet_data me;
   int start, end;
-  int f7_pos; 
   bool good_packet;
   int good_end;
+
+  int len, trim_len;
+  uint8_t *blk;
 
   // process packets queued
   while (uxQueueMessagesWaiting(qFromApp) > 0) {
@@ -483,15 +478,31 @@ void handle_app_packet() {
     end = packet_app.size - 1;
     start = 0;
     good_end = 0;
-    //remove_block_headers(&packet_app, &f7_pos);
-    while (start < end) {
+
+    while (start < packet_app.size) {
       if (scan_packet(&packet_app, &start, &end)) {
         DEBUG_COMMS("Got a good packet %d %d", start, end);
-        send_app_packet(&packet_app, &start, &end);
+
+        len = end - start + 1;
+        blk = &packet_app.ptr[start];
+
+        // process the packet to extract the msgpack data
+        trim_len = remove_headers(blk, blk, len);
+        fix_bit_eight(blk, trim_len);
+        len = compact(blk, blk, trim_len);
+    
+        // send on for processing
+        new_packet_from_data(&me, blk, len);
+        xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
+
         good_end = end;
       }
       start = end + 1;
     }
+    DEB("Scan app ");
+    DEB(start);
+    DEB(" ");
+    DEBUG(packet_app.size);
     // remove all good packets fromt the start
     if (good_end != 0) {
       remove_packet_start(&packet_app, good_end);
@@ -534,10 +545,6 @@ int last_sequence_to_spark;
 // fix_bit_eight() - add the missing eighth bit to each data byte
 // compact()       - remove the multi-chunk header and the eighth bit byte to get to msgpack data
 // ------------------------------------------------------------------------------------------------------------
-
-void clone(byte *to, byte *from, int len) {
-  memcpy(to, from, len);
-}
 
 // remove_headers())
 // Removes any headers (0x01fe and 0xf001) from the packets and leaves the rest
@@ -713,86 +720,10 @@ int compact(byte *out_block, byte *in_block, int in_len) {
   return out_pos;
 }
 
-// ------------------------------------------------------------------------------------------------------------
-// Routines to process the raw data into msgpack format and put into the message buffer
-// ------------------------------------------------------------------------------------------------------------
-
-void spark_process() 
-{
-  int len;
-  int trim_len;
-  uint8_t *blk;
-
-  struct packet_data qe;
-  struct packet_data me;
-
-  while (uxQueueMessagesWaiting(qFromSparkFilter) > 0) {
-    xQueueReceive(qFromSparkFilter, &qe, (TickType_t) 0);
-
-    len = qe.size;
-    blk = qe.ptr;
-
-    //dump_raw_block(block_from_spark, len);   
-    trim_len = remove_headers(blk, blk, len);
-    fix_bit_eight(blk, trim_len);
-    len = compact(blk, blk, trim_len);
-    //dump_processed_block(block_from_spark, len);
-    
-    new_packet_from_data(&me, blk, len);
-    xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
-    //uxQueueMessagesWaiting(spark_msg_in.qList);
-    //xQueueReceive(spark_msg_in.qList, &me, (TickType_t) 0);
-    //clear_packet(&me);
-
-    //spark_msg_in.set_from_array(blk, len); 
-    clear_packet(&qe);
-  }
-}
-
-void app_process() 
-{
-  int len;
-  int trim_len;
-  uint8_t *blk;
-  struct packet_data qe;
-  struct packet_data me;
-
-  while (uxQueueMessagesWaiting(qFromAppFilter) > 0) {
-    xQueueReceive(qFromAppFilter, &qe, (TickType_t) 0);
-
-    len = qe.size;
-    blk = qe.ptr;
-
-    //dump_raw_block(block_from_app, len); 
-    trim_len = remove_headers(blk, blk, len);
-    fix_bit_eight(blk, trim_len);
-    len = compact(blk, blk, trim_len);
-    //dump_processed_block(block_from_app, len);
-
-    new_packet_from_data(&me, blk, len);
-    xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
-    //uxQueueMessagesWaiting(app_msg_in.qList);
-    //xQueueReceive(app_msg_in.qList, &me, (TickType_t) 0);
-    //clear_packet(&me);
-
-    //app_msg_in.set_from_array(blk, len); 
-    clear_packet(&qe);
-  }
-}
-
-
 void process_sparkIO() {
-  
   handle_app_packet();
   handle_spark_packet();
-
-  spark_process();
-  app_process();
 }
-
-
-
-
 
 
 // ------------------------------------------------------------------------------------------------------------
@@ -2133,7 +2064,7 @@ int add_headers(byte *out_block, byte *in_block, int in_len) {
 
 // only need one temp block out as we won't send to app and amp at same time (not thread safe!)
 
-byte block_out_temp[BLOCK_SIZE];
+byte block_out_temp[OUT_BLOCK_SIZE];
 
 void spark_send() {
   int len;
@@ -2175,7 +2106,8 @@ void spark_send() {
         unsigned long t;
         t = millis();
         while (!done && (millis() - t) < 400) {  // add timeout just in case of no acknowledgement
-          spark_process();
+          //spark_process();
+          process_sparkIO();
           done = spark_msg_in.check_for_acknowledgement();
         };
       } 

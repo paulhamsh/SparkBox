@@ -6,7 +6,7 @@
 
 uint8_t license_key[64];
 
-#define BLOCK_SIZE 1500
+#define OUT_BLOCK_SIZE 900 // largest preset seen so far is 800 bytes
 
 // MESSAGE INPUT CLASS
 class MessageIn
@@ -84,7 +84,7 @@ class MessageOut
 
     int buf_size;
     int buf_pos;
-    uint8_t buffer[BLOCK_SIZE];
+    uint8_t buffer[OUT_BLOCK_SIZE];
 
     int cmd_base;
     int out_msg_chksum;
