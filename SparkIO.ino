@@ -282,7 +282,7 @@ void remove_packet_start(struct packet_data *pd, int end) {
 //#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
 #define DUMP_BUFFER(p, s) {}
 
-bool scan_packet (struct packet_data *pd, int *start, int *this_end) {
+bool scan_packet (struct packet_data *pd, int *start, int *this_end, int end) {
   int cmd; 
   int sub;
   int checksum;
@@ -300,14 +300,13 @@ bool scan_packet (struct packet_data *pd, int *start, int *this_end) {
   uint8_t *buf = pd->ptr;
   int len = pd->size;
   int p = *start;
-  int end = *this_end;
 
   while (!is_done) {
     // check to see if past end of buffer
     if (p > end ) {
       is_done = true;
       is_good = false;
-      en = p;
+      en = p-1;   // is this ok????
     }
  
     // skip a block header if we find one
@@ -417,7 +416,7 @@ void handle_spark_packet() {
     good_end = 0;
 
     while (start < packet_spark.size) {  
-      if (scan_packet(&packet_spark, &start, &end)) {
+      if (scan_packet(&packet_spark, &start, &end, packet_spark.size-1)) {
         DEBUG_COMMS("Got a good packet %d %d", start, end);
 
         len = end - start + 1;
@@ -436,10 +435,7 @@ void handle_spark_packet() {
       }
       start = end + 1;
     }
-    DEB("Scan spark");
-    DEB(start);
-    DEB(" ");
-    DEBUG(packet_spark.size);
+
     // remove all good packets fromt the start
     if (good_end != 0) {
       remove_packet_start(&packet_spark, good_end);
@@ -480,7 +476,7 @@ void handle_app_packet() {
     good_end = 0;
 
     while (start < packet_app.size) {
-      if (scan_packet(&packet_app, &start, &end)) {
+      if (scan_packet(&packet_app, &start, &end, packet_app.size-1)) {
         DEBUG_COMMS("Got a good packet %d %d", start, end);
 
         len = end - start + 1;
@@ -499,10 +495,7 @@ void handle_app_packet() {
       }
       start = end + 1;
     }
-    DEB("Scan app ");
-    DEB(start);
-    DEB(" ");
-    DEBUG(packet_app.size);
+
     // remove all good packets fromt the start
     if (good_end != 0) {
       remove_packet_start(&packet_app, good_end);
