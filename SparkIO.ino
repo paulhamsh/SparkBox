@@ -17,8 +17,7 @@
  *  
  *  loop() {
  *    ...
- *    spark_process();
- *    app_process();
+ *    process_sparkIO();
  *    ...
  *    do something
  *    ...
@@ -81,8 +80,6 @@
 
 CircularArray array_spark;
 CircularArray array_app;
-
-
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to dump full blocks of data
@@ -178,7 +175,9 @@ void show_heap() {
 
 int memrnd(int mem) {
   int new_mem;
+  return mem;
 
+  // can round if we want to!
   if (mem <= 20) new_mem = 20;
   else if (mem <= 100) new_mem = 100;
   else if (mem <= 800) new_mem = 800;
@@ -215,7 +214,6 @@ uint8_t *realloc_check(uint8_t *ptr, int new_size) {
   return p; 
 }
 
-
 void free_check(uint8_t *ptr) {
   DEBUG_MEMORY("Free: %p", ptr);
   free(ptr);
@@ -225,7 +223,6 @@ void free_check(uint8_t *ptr) {
 // ------------------------------------------------------------------------------------------------------------
 // Packet handling routines
 // ------------------------------------------------------------------------------------------------------------
-
 
 void new_packet(struct packet_data *pd, int length) {
   pd->ptr = (uint8_t *) malloc_check(length) ;
@@ -237,45 +234,12 @@ void new_packet_from_data(struct packet_data *pd, uint8_t *data, int length) {
   pd->size = length;
   for (int i = 0; i < length; i++)
     pd->ptr[i] = data[i];
-  //memcpy(pd->ptr, data, length);
 }
 
 void clear_packet(struct packet_data *pd) {
   free_check(pd->ptr);
   pd->size = 0; 
 }
-
-/*
-void append_packet(struct packet_data *pd, struct packet_data *add) {
-  if (pd->size == 0)
-    pd->ptr = (uint8_t *)  malloc_check(add->size);
-  else
-    pd->ptr = (uint8_t *)  realloc_check(pd->ptr, pd->size + add->size);
-  memcpy (&pd->ptr[pd->size], add->ptr, add->size);
-  pd->size += add->size;
-}
-*/
-/*
-void remove_packet_start(struct packet_data *pd, int end) {
-  if (end == pd->size - 1) {
-    // processed the whole block
-    pd->size = 0;
-    free_check(pd->ptr);
-  }
-  else if (end != 0) {
-    uint8_t *p = pd->ptr;
-    int new_start = end + 1;
-    int new_size = pd->size - new_start;
-    p = (uint8_t *) malloc_check(new_size);
-
-    for (int i = 0; i < new_size; i++)
-      p[i] = pd->ptr[new_start + i];
-    free_check(pd->ptr);
-    pd->ptr = p;
-    pd->size = new_size;
-  }
-}
-*/
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to handle validating packets of data from SparkComms before further processing
@@ -434,9 +398,7 @@ void handle_spark_packet() {
       fix_bit_eight(array_spark, trim_len);
       len = compact(array_spark, array_spark, trim_len);
 
-      new_packet(&me, len);
-      me.size = array_spark.extract(me.ptr, len, orig_len);
-      xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
+      array_spark.extract_append(spark_msg_in.message_in, len, orig_len);
     }
   }
 
@@ -489,9 +451,7 @@ void handle_app_packet() {
       fix_bit_eight(array_app, trim_len);
       len = compact(array_app, array_app, trim_len);
 
-      new_packet(&me, len);
-      me.size = array_app.extract(me.ptr, len, orig_len);
-      xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
+      array_app.extract_append(app_msg_in.message_in, len, orig_len);
     }
   }
 
@@ -722,25 +682,9 @@ void process_sparkIO() {
 // Read messages from the in_message ring buffer and copy to a SparkStructure format
 // ------------------------------------------------------------------------------------------------------------
 
-void MessageIn::set_buffer(struct packet_data *me) 
-{
-  buf_size = me->size;
-  buffer = me->ptr;
-  buf_pos = 0;
-}
-
 void MessageIn::read_byte(uint8_t *b)
 {
-  //uint8_t a;
-  //in_message.get(&a);
-  //*b = a;
-
-  if (buf_pos < buf_size)
-    *b = buffer[buf_pos++];
-  else {
-    *b = 0;
-    DEBUG("READ PAST END OF BUFFER");
-  }
+  *b = message_in[message_pos++];
 }   
 
 void MessageIn::read_uint(uint8_t *b)
@@ -857,16 +801,9 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   uint8_t num, num1, num2;
   uint8_t num_effects;
 
-  struct packet_data me;
+  if (message_in.length() == 0) return false;
 
-  if (uxQueueMessagesWaiting(qList) > 0) {
-    xQueueReceive(qList, &me, (TickType_t) 0);
-    set_buffer(&me);
-  } 
-  else
-    return false;
-
-  //if (in_message.is_empty()) return false;
+  message_pos = 0;
 
   read_byte(&cmd);
   read_byte(&sub);
@@ -878,21 +815,6 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   bytes_to_uint(len_h, len_l, &len);
   bytes_to_uint(cmd, sub, &cs);
 
-  if (chksum_errors > 0) {
-    DEBUG("Got a checksum error - need to skip this chunk");
-    DEB(cmd, HEX); DEB(" ");
-    DEB(sub, HEX); DEB(" : ");
-    DEB(chksum_errors, HEX); DEB(" : ");
-    DEB(sequence, HEX); DEB(" : ");
-    for (i = 0; i < len; i++) {
-      read_byte(&junk);
-      if (junk < 16) DEB("0");
-      DEB(junk, HEX);
-      DEB(" ");
-    }
-    DEBUG("");
-    return false;
-  }
 
   *cmdsub = cs;
   switch (cs) {
@@ -1359,8 +1281,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB("Unprocessed message ");
       DEB(cs, HEX);
       DEB(" length ");
-      DEBUG(len);
-/*
+      DEB(len);
+
       DEB(":");
       if (len != 0) {
         for (i = 0; i < len - 6; i++) {
@@ -1370,18 +1292,9 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
         }
       }
       DEBUG();
-*/
-      // defensively clear the message buffer in case this is a bug
-      //in_message.clear();
   }
 
-  /*
-  if (!in_message.is_empty()) {
-    DEBUG("SparkIO: Still something in in_message after processing ");
-  }
-  */
-
-  clear_packet(&me);
+  message_in.shrink(len);
   return true;
 }
 
@@ -1394,18 +1307,10 @@ bool MessageIn::check_for_acknowledgement() {
 
   unsigned int len;
   unsigned int cs;
-   
-  uint8_t junk;
-  int i, j;
+  
+  if (message_in.length() == 0) return false;
 
-  struct packet_data me;
-
-  if (uxQueueMessagesWaiting(qList) > 0) {
-    xQueueReceive(qList, &me, (TickType_t) 0);
-    set_buffer(&me);
-  } 
-  else
-    return false;
+  message_pos = 0;
 
   read_byte(&cmd);
   read_byte(&sub);
@@ -1417,11 +1322,12 @@ bool MessageIn::check_for_acknowledgement() {
   bytes_to_uint(len_h, len_l, &len);
   bytes_to_uint(cmd, sub, &cs);
 
-  //for (i = HEADER_LEN; i < len; i++) read_byte(&junk);
-  if (cs == 0x0401 || cs == 0x0501)  return true;
+  message_in.shrink(len);
 
-  clear_packet(&me);
-  return false;
+  if (cs == 0x0401 || cs == 0x0501)  
+    return true;
+  else
+    return false;
 };
 
 

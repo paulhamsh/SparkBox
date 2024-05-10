@@ -14,17 +14,14 @@ class MessageIn
 {
   public:
     MessageIn() {
-      qList = xQueueCreate(20, sizeof (struct packet_data));
+      message_pos = 0;
     };
 
     bool check_for_acknowledgement();
     bool get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *preset);
-    QueueHandle_t qList;
-    int buf_size;
-    int buf_pos;
-    uint8_t *buffer;
-
-    void set_buffer(struct packet_data *me);
+    
+    CircularArray message_in;
+    int message_pos;
 
     void read_string(char *str);
     void read_prefixed_string(char *str);
@@ -40,7 +37,6 @@ class MessageOut
 {
   public:
     MessageOut(unsigned int base): cmd_base(base) {};
-    
 
     // creating messages to send
     void start_message(int cmdsub);
