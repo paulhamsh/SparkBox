@@ -4,6 +4,7 @@ const uint8_t notifyOn[] = {0x1, 0x0};
 
 struct packet_data packet_spark;
 struct packet_data packet_app;
+
 unsigned long lastAppPacketTime;
 unsigned long lastSparkPacketTime;
 

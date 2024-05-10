@@ -79,6 +79,10 @@
 #define HEADER_LEN 6
 #define CHUNK_HEADER_LEN 6
 
+CircularArray array_spark;
+CircularArray array_app;
+
+
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to dump full blocks of data
@@ -161,9 +165,9 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 
 
 //#define DEBUG_MEMORY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
-#define DEBUG_HEAP(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
+//#define DEBUG_HEAP(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
 #define DEBUG_MEMORY(...) {}
-//#define DEBUG_HEAP(...) {}
+#define DEBUG_HEAP(...) {}
 
 void show_heap() {
   DEBUG_HEAP("Total heap: %d", ESP.getHeapSize());
@@ -241,6 +245,7 @@ void clear_packet(struct packet_data *pd) {
   pd->size = 0; 
 }
 
+/*
 void append_packet(struct packet_data *pd, struct packet_data *add) {
   if (pd->size == 0)
     pd->ptr = (uint8_t *)  malloc_check(add->size);
@@ -249,7 +254,8 @@ void append_packet(struct packet_data *pd, struct packet_data *add) {
   memcpy (&pd->ptr[pd->size], add->ptr, add->size);
   pd->size += add->size;
 }
-
+*/
+/*
 void remove_packet_start(struct packet_data *pd, int end) {
   if (end == pd->size - 1) {
     // processed the whole block
@@ -269,6 +275,7 @@ void remove_packet_start(struct packet_data *pd, int end) {
     pd->size = new_size;
   }
 }
+*/
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to handle validating packets of data from SparkComms before further processing
@@ -282,7 +289,7 @@ void remove_packet_start(struct packet_data *pd, int end) {
 //#define DUMP_BUFFER(p, s) {for (int _i=0; _i <=  (s); _i++) {Serial.print( (p)[_i], HEX); Serial.print(" ");}; Serial.println();}
 #define DUMP_BUFFER(p, s) {}
 
-bool scan_packet (struct packet_data *pd, int *start, int *this_end, int end) {
+bool scan_packet (CircularArray &buf, int *start, int *this_end, int end) {
   int cmd; 
   int sub;
   int checksum;
@@ -297,8 +304,7 @@ bool scan_packet (struct packet_data *pd, int *start, int *this_end, int end) {
   bool is_first_multi = false;
   bool found_chunk = false;
 
-  uint8_t *buf = pd->ptr;
-  int len = pd->size;
+  int len = buf.length();
   int p = *start;
 
   while (!is_done) {
@@ -310,12 +316,12 @@ bool scan_packet (struct packet_data *pd, int *start, int *this_end, int end) {
     }
  
     // skip a block header if we find one
-    else if (buf[p] == 0x01 && buf[p + 1] == 0xfe) {
+    else if (end - p >= 2 && buf[p] == 0x01 && buf[p + 1] == 0xfe) {
       p += 16;
     }
     
     // found start of a message - either single or multi-chunk
-    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (end - p >= 6)) {
+    else if (end - p >= 6 && buf [p] == 0xf0 && buf[p + 1] == 0x01) {
 
       //DEBUG_COMMS("Pos %3d: new header", p);
       found_chunk = true;
@@ -329,7 +335,7 @@ bool scan_packet (struct packet_data *pd, int *start, int *this_end, int end) {
       else
        is_multi = false;
     
-      if (is_multi && (end - p >= 9)) {
+      if (is_multi && end - p >= 9) {
         multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);         
         multi_this_chunk   = buf[p + 8] | (buf[p + 6] & 0x02? 0x80 : 0x00);
         is_first_multi = (multi_this_chunk == 0);
@@ -393,7 +399,6 @@ void handle_spark_packet() {
   int good_end;
 
   int len, trim_len;
-  uint8_t *blk;
 
   // process packets queued
   while (uxQueueMessagesWaiting(qFromSpark) > 0) {
@@ -405,45 +410,40 @@ void handle_spark_packet() {
       send_to_app(qe.ptr, qe.size);
     }
 
-    append_packet(&packet_spark, &qe);
+    array_spark.append(qe.ptr, qe.size);
     clear_packet(&qe); // this was created in app_callback, no longer needed
+  }
+  
+  end = array_spark.length() - 1;
+  start = 0;
+  good_end = 0;
 
-    DEBUG_STATUS("pd size %d", packet_spark.size);
+  if (array_spark.length() > 0) {  
+    if (scan_packet(array_spark, &start, &end, array_spark.length())) {
+      DEBUG_COMMS("Got a good packet %d %d", start, end);
+      len = end - start + 1;
+      int orig_len = len;
 
-    end = packet_spark.size - 1;
-
-    start = 0;
-    good_end = 0;
-
-    while (start < packet_spark.size) {  
-      if (scan_packet(&packet_spark, &start, &end, packet_spark.size-1)) {
-        DEBUG_COMMS("Got a good packet %d %d", start, end);
-
-        len = end - start + 1;
-        blk = &packet_spark.ptr[start];
-
-        // process the packet to extract the msgpack data
-        trim_len = remove_headers(blk, blk, len);
-        fix_bit_eight(blk, trim_len);
-        len = compact(blk, blk, trim_len);
-    
-        // send on for processing
-        new_packet_from_data(&me, blk, len);
-        xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
-
-        good_end = end;
+      if (start > 0) {
+        array_spark.shrink(start);    // clear out any bad data
+        end =- start;
       }
-      start = end + 1;
-    }
 
-    // remove all good packets fromt the start
-    if (good_end != 0) {
-      remove_packet_start(&packet_spark, good_end);
+      // process the packet to extract the msgpack data
+      trim_len = remove_headers(array_spark, array_spark, len);
+      fix_bit_eight(array_spark, trim_len);
+      len = compact(array_spark, array_spark, trim_len);
+
+      new_packet(&me, len);
+      me.size = array_spark.extract(me.ptr, len, orig_len);
+      xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
     }
   }
+
   // check for timeouts and delete the packet, it took too long to get a proper packet
-  if ((packet_spark.size > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
-    clear_packet(&packet_spark);
+  if ((array_spark.length() > 0) && (millis() - lastSparkPacketTime > SPARK_TIMEOUT)) {
+    array_spark.clear();
+    Serial.println("CLEARED SPARK");
   }
 }
 
@@ -455,7 +455,6 @@ void handle_app_packet() {
   int good_end;
 
   int len, trim_len;
-  uint8_t *blk;
 
   // process packets queued
   while (uxQueueMessagesWaiting(qFromApp) > 0) {
@@ -466,45 +465,42 @@ void handle_app_packet() {
       send_to_spark(qe.ptr, qe.size);
     }
 
-    append_packet(&packet_app, &qe);
+    array_app.append(qe.ptr, qe.size);
     clear_packet(&qe); // this was created in app_callback, no longer needed
+  }
 
-    DEBUG_STATUS("pd size %d", packet_app.size);
+  end = array_app.length() - 1;
+  start = 0;
+  good_end = 0;
 
-    end = packet_app.size - 1;
-    start = 0;
-    good_end = 0;
+  if (array_app.length() > 0) {  
+    if (scan_packet(array_app, &start, &end, array_app.length())) {
+      DEBUG_COMMS("Got a good packet %d %d", start, end);
+      len = end - start + 1;
+      int orig_len = len;
 
-    while (start < packet_app.size) {
-      if (scan_packet(&packet_app, &start, &end, packet_app.size-1)) {
-        DEBUG_COMMS("Got a good packet %d %d", start, end);
-
-        len = end - start + 1;
-        blk = &packet_app.ptr[start];
-
-        // process the packet to extract the msgpack data
-        trim_len = remove_headers(blk, blk, len);
-        fix_bit_eight(blk, trim_len);
-        len = compact(blk, blk, trim_len);
-    
-        // send on for processing
-        new_packet_from_data(&me, blk, len);
-        xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
-
-        good_end = end;
+      if (start > 0) {
+        array_app.shrink(start);    // clear out any bad data
+        end =- start;
       }
-      start = end + 1;
-    }
 
-    // remove all good packets fromt the start
-    if (good_end != 0) {
-      remove_packet_start(&packet_app, good_end);
+      // process the packet to extract the msgpack data
+      trim_len = remove_headers(array_app, array_app, len);
+      fix_bit_eight(array_app, trim_len);
+      len = compact(array_app, array_app, trim_len);
+
+      new_packet(&me, len);
+      me.size = array_app.extract(me.ptr, len, orig_len);
+      xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
     }
   }
+
   // check for timeouts and delete the packet, it took too long to get a proper packet
-  if ((packet_app.size > 0) && (millis() - lastAppPacketTime > APP_TIMEOUT)) {
-    clear_packet(&packet_app);
+  if ((array_app.length() > 0) && (millis() - lastAppPacketTime > APP_TIMEOUT)) {
+    array_app.clear();
+    Serial.println("CLEARED APP");
   }
+
 }
 
 
@@ -549,7 +545,7 @@ int last_sequence_to_spark;
 // 4  number of checksum errors in the original block
 // 5  sequence number of the original block
 
-int remove_headers(byte *out_block, byte *in_block, int in_len) {
+int remove_headers(CircularArray &out_block, CircularArray &in_block, int in_len) {
   int new_len  = 0;
   int in_pos   = 0;
   int out_pos  = 0;
@@ -609,7 +605,7 @@ int remove_headers(byte *out_block, byte *in_block, int in_len) {
   return out_pos;
 }
 
-void fix_bit_eight(byte *in_block, int in_len) {
+void fix_bit_eight(CircularArray &in_block, int in_len) {
   int len = 0;
   int in_pos = 0;
   int counter = 0;
@@ -652,7 +648,7 @@ void fix_bit_eight(byte *in_block, int in_len) {
 
 // TODO - this currently can cope with multiple messages in a sequence, but doesn't need to be able to do that any more!!!!
 
-int compact(byte *out_block, byte *in_block, int in_len) {
+int compact(CircularArray &out_block, CircularArray &in_block, int in_len) {
   int len = 0;
   int in_pos = 0;
   int out_pos = 0;

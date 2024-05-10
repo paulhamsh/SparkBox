@@ -3,6 +3,7 @@
 
 #include "SparkStructures.h"
 #include "SparkComms.h"
+#include "CircularArray.h"
 
 uint8_t license_key[64];
 
