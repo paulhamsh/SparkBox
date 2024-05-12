@@ -138,7 +138,7 @@ int CircularArray::length() {
       DEBUG_ARRAY("Trying to append too much, limited to %d", len_to_copy);
     }
     // copy
-    for (i = 0; i < len_to_copy; i++) {
+    for (int i = 0; i < len_to_copy; i++) {
       to.buf[(to.end + i) % to.size] = buf[(start + i) % size];
     }
     // expand destination
