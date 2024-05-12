@@ -273,17 +273,23 @@ bool connect_to_all() {
 
       if (device.isAdvertisingService(SpServiceUuid)) {
         strncpy(spark_ble_name, device.getName().c_str(), SIZE_BLE_NAME);
-        DEBUG("Found ");
-        DEBUG(spark_ble_name);
+        DEB("Found '");
+        DEB(spark_ble_name);
+        DEBUG("'");
 
-        if (strcmp(spark_ble_name, "Spark 40 BLE") == 0) 
+
+        if (strstr(spark_ble_name, "40") != NULL) 
           spark_type = S40;
-        else if (strcmp(spark_ble_name, "Spark GO BLE") == 0)
+        else if (strstr(spark_ble_name, "GO") != NULL)
           spark_type = GO;
-        else if (strcmp(spark_ble_name, "Spark MINI BLE") == 0)        
+        else if (strstr(spark_ble_name, "MINI") != NULL)        
           spark_type = MINI;  
-        else if (strcmp(spark_ble_name, "Spark LIVE BLE") == 0)     
+        else if (strstr(spark_ble_name, "LIVE") != NULL)     
           spark_type = LIVE; 
+        else {
+          DEBUG("Couldn't match Spark type");
+          spark_type = NONE;
+        }
 
         found_sp = true;
         connected_sp = false;
@@ -301,14 +307,27 @@ bool connect_to_all() {
   // now advertise Serial Bluetooth
   bt = new BluetoothSerial();
   bt->register_callback(bt_callback);
-  len = strlen(spark_ble_name);
-  strncpy(spark_bt_name, spark_ble_name, len - 4);   // effectively strip off the ' BLE' at the end
-  spark_bt_name[len - 4] = '\0';
-  strcat(spark_bt_name, " Audio");
-
-  DEB("Creating classic bluetooth with name ");
-  DEBUG(spark_bt_name);
   
+  switch (spark_type) {
+    case NONE:
+    case S40:
+      spark_bt_name = "Spark 40 Audio";
+      break;
+    case MINI:
+      spark_bt_name = "Spark MINI Audio";
+      break;
+    case GO:
+      spark_bt_name = "Spark GO Audio";
+      break;
+    case LIVE:
+      spark_bt_name = "Spark LIVE Audio";
+      break;
+  }
+
+  DEB("Creating classic bluetooth with name '");
+  DEB(spark_bt_name);
+  DEBUG("'");
+
   if (!bt->begin (spark_bt_name, false)) {
     DEBUG("Classic bluetooth init fail");
     while (true);

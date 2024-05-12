@@ -81,7 +81,7 @@ int CircularArray::length() {
     }
     return le;
   }
-
+*/
 
   int CircularArray::append(uint8_t *data, int len) {
     int le;

@@ -11,11 +11,11 @@
 #endif
 
 
-enum {S40, MINI, GO, LIVE} spark_type = MINI;
+enum {S40, MINI, GO, LIVE, NONE} spark_type;
 
 #define SIZE_BLE_NAME 20
 char spark_ble_name[SIZE_BLE_NAME + 1];
-char spark_bt_name[SIZE_BLE_NAME + 1];
+char *spark_bt_name;
 
 //#define BLE_DUMP 
 
