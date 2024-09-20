@@ -91,7 +91,7 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 
 void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
 
-#ifdef BLE_DUMP
+#ifdef BLE_AMP_DUMP
   int i;
   byte b;
 
@@ -125,6 +125,25 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     //DEB("Got BLE callback size: ");
     //DEBUG(size);
 
+#ifdef BLE_APP_DUMP
+    int i;
+    byte b;
+
+    DEB("FROM APP:          ");
+
+    for (i = 0; i < size; i++) {
+      b = buf[i];
+      if (b < 16) DEB("0");
+      DEB(b, HEX);    
+      DEB(" ");
+      if (i % 32 == 31) { 
+        DEBUG("");
+        DEB("                   ");
+      }
+    }
+    DEBUG();
+#endif
+
     struct packet_data qe;
     new_packet_from_data(&qe, (uint8_t *) buf, size);
     xQueueSend (qFromApp, &qe, (TickType_t) 0);
@@ -141,11 +160,11 @@ void data_callback(const uint8_t *buffer, size_t size) {
   //DEB("Got SerialBT callback size: ");
   //DEBUG(size);
 
-#ifdef BLE_DUMP
+#ifdef BLE_APP_DUMP
     int i = 0;
     byte b;
     DEB("FROM APP:          ");
-    for (i=0; i < size; i++) {
+    for (i = 0; i < size; i++) {
       b = buffer[i];
       if (b < 16) DEB("0");
       DEB(b, HEX);    
@@ -286,6 +305,8 @@ bool connect_to_all() {
           spark_type = MINI;  
         else if (strstr(spark_ble_name, "LIVE") != NULL)     
           spark_type = LIVE; 
+        else if (strstr(spark_ble_name, "2") != NULL)     
+          spark_type = SPARK2; 
         else {
           DEBUG("Couldn't match Spark type");
           spark_type = NONE;
@@ -322,6 +343,9 @@ bool connect_to_all() {
     case LIVE:
       spark_bt_name = "Spark LIVE Audio";
       break;
+    case SPARK2:
+      spark_bt_name = "Spark 2 Audio";
+      break;   
   }
 
   DEB("Creating classic bluetooth with name '");

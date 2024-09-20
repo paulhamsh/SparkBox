@@ -58,7 +58,7 @@ extern String bankConfigFile;
 
 //******************************************************************************************
 #define PGM_NAME "SparkBox"
-#define VERSION "V1.00" 
+#define VERSION "V2.00" 
 
 extern eMode_t curMode;
 extern eMode_t oldMode;
@@ -171,10 +171,10 @@ void setup() {
   
   // Manually toggle the /RST pin to add Heltec module functionality
   // but without the Heltec library
-  //pinMode(16,OUTPUT);
-  //digitalWrite(16, LOW);
-  //delay(50);
-  //digitalWrite(16, HIGH);
+  pinMode(16,OUTPUT);
+  digitalWrite(16, LOW);
+  delay(50);
+  digitalWrite(16, HIGH);
 
   // Initialize device OLED display, and flip screen, as OLED library starts upside-down
   ui.setTargetFPS(35);

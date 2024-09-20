@@ -1,6 +1,7 @@
 #ifndef SparkComms_h
 #define SparkComms_h
 
+
 // Timer routines
 //#define TIMER 100000
 #define SPARK_TIMEOUT 1000
@@ -11,13 +12,14 @@
 #endif
 
 
-enum {S40, MINI, GO, LIVE, NONE} spark_type;
+enum {S40, MINI, GO, LIVE, SPARK2, NONE} spark_type;
 
 #define SIZE_BLE_NAME 20
 char spark_ble_name[SIZE_BLE_NAME + 1];
 char *spark_bt_name;
 
-//#define BLE_DUMP 
+//#define BLE_AMP_DUMP 
+#define BLE_APP_DUMP
 
 #define DEBUG_ON
 

@@ -94,12 +94,15 @@ bool spark_state_tracker_start() {
     case LIVE:
       DEBUG("Spark LIVE");
       break;      
+    case SPARK2:
+      DEBUG("Spark 2");
+      break;     
     case NONE:
       DEBUG("Unknown");
       break;          
   }
 
-  if (spark_type != LIVE) { // should be NOT LIVE but just doing this anyway
+  if (spark_type != LIVE && spark_type != SPARK2) { 
     num_inputs = 1;
     num_presets = 4;                 
     max_preset = 3;
@@ -171,7 +174,7 @@ bool spark_state_tracker_start() {
     };
   }
 
-  if (spark_type == LIVE) got_all_presets = false;
+  if (spark_type == LIVE || spark_type == SPARK2) got_all_presets = false;
 
   // Get the presets from INPUT 2 on LIVE
   preset_to_get = 0x0300;    // The LIVE presets
@@ -425,7 +428,7 @@ void update_ui_hardware() {
 
 
 void set_input1() {
-  if (spark_type == LIVE) {
+  if (spark_type == LIVE || spark_type == SPARK2) {
     spark_msg_out.select_live_input_1();
     spark_send();
   }
