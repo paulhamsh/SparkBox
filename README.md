@@ -4,10 +4,6 @@ SparkBox is a BT pedal for the Positive Grid Spark 40.  Now with expression peda
 
 # UPDATE:  Core libraries updated for Spark, Spark2, MINI, Go and LIVE.  
 
-Libraries required:   
-NimBLE-Arduino2.3.7 
-ESP32 by Espressif 3.3.5
-
 ![alt text](https://github.com/happyhappysundays/SparkBox/blob/main/Pictures/SparkBox_final.jpg?raw=true)
 
 # Functions
